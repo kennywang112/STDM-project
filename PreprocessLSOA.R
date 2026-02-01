@@ -14,15 +14,32 @@ lsoa_counts <- accidents_with_lsoa %>%
 
 london_lsoa_stats <- london_lsoa %>%
   left_join(lsoa_counts, by = "lsoa21cd") %>%
-  mutate(accident_count = replace_na(accident_count, 0))
+  mutate(accident_count = replace_na(accident_count, 0))%>%
+  left_join(lsoa_pop, by=c("lsoa21cd"="lsoa21cd"))%>%
+  mutate(accidents_per_1000 = (accident_count / population) * 1000)
 
 tmap_mode("plot")
-tm_shape(london_lsoa_stats) +
+map1 <- tm_shape(london_lsoa_stats) +
   tm_polygons(col = "accident_count", 
               style = "jenks",
               palette = "Reds", 
               title = "Accidents per LSOA",
               border.alpha = 0.1)
+
+map2 <- tm_shape(london_lsoa_stats) +
+  tm_polygons(col = "accidents_per_1000", 
+              style = "jenks",
+              palette = "Reds",
+              border.alpha = 0.1)
+
+tmap_arrange(map1, map2, ncol = 2)
+
+# Correlation plot
+library(ggpubr)
+ggplot(london_lsoa_stats, aes(x = population, y = accident_count)) +
+  geom_point(alpha = 0.6, color = "steelblue") +
+  geom_smooth(method = "lm", color = "darkred", se = FALSE) +
+  stat_cor(method = "pearson", label.x = 1000, label.y = 50)
 
 # plot neighbor
 nb_list <- poly2nb(london_lsoa)
@@ -33,9 +50,9 @@ coords <- st_coordinates(st_centroid(london_lsoa))
 nb_lines <- nb2lines(neighbours, coords = coords, proj4string = st_crs(london_lsoa)$proj4string)
 nb_lines_sf <- st_as_sf(nb_lines)
 
-tm_shape(london_lsoa) + 
+tm_shape(london_lsoa) +
   tm_borders(col = "lightgrey") +
-  tm_shape(nb_lines_sf) + 
+  tm_shape(nb_lines_sf) +
   tm_lines(col = "red", alpha = 0.5)
 
 
@@ -99,18 +116,19 @@ moran_plot_data <- spatial_data %>%
 moran_i_value <- round(moran_test$estimate[1], 3)
 label_text <- paste("Regression Line\nSlope =", moran_i_value)
 
-ggplot(moran_plot_data, aes(x = z_score, y = lag_z)) +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "black", alpha = 0.6) +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "black", alpha = 0.6) +
-  geom_point(aes(color = quadrant), alpha = 0.8, size = 1.5) +
-  geom_smooth(method = "lm", se = FALSE, color = "steelblue", linewidth = 1) +
-  annotate("text", x = min(moran_plot_data$z_score), y = max(moran_plot_data$lag_z), 
-           label = label_text, hjust = 0, vjust = 1, 
-           color = "black", size = 4, fontface = "bold") +
-  scale_color_manual(values = lisa_colors) +
-  labs(title = "Moran Scatter Plot (Accidents)",
-       x = "Standardized Num of Accidents (Z-score)",
-       y = "Spatial Lag of Accidents (Z-score)") +
-  theme_bw() +
-  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
-        legend.position = "bottom")
+moran <- moran.plot(london_lsoa_stats$accident_count, listw = W_list)
+# ggplot(moran_plot_data, aes(x = z_score, y = lag_z)) +
+#   geom_vline(xintercept = 0, linetype = "dashed", color = "black", alpha = 0.6) +
+#   geom_hline(yintercept = 0, linetype = "dashed", color = "black", alpha = 0.6) +
+#   geom_point(aes(color = quadrant), alpha = 0.8, size = 1.5) +
+#   geom_smooth(method = "lm", se = FALSE, color = "steelblue", linewidth = 1) +
+#   annotate("text", x = min(moran_plot_data$z_score), y = max(moran_plot_data$lag_z), 
+#            label = label_text, hjust = 0, vjust = 1, 
+#            color = "black", size = 4, fontface = "bold") +
+#   scale_color_manual(values = lisa_colors) +
+#   labs(title = "Moran Scatter Plot (Accidents)",
+#        x = "Standardized Num of Accidents (Z-score)",
+#        y = "Spatial Lag of Accidents (Z-score)") +
+#   theme_bw() +
+#   theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+#         legend.position = "bottom")
