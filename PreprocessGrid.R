@@ -1,13 +1,7 @@
-library(tidyverse)
 library(sf)
 library(tmap)
 source('utils/boundaries.R')
-
-accident <- read_csv('./Data/dft-road-casualty-statistics-collision-provisional-2025.csv') %>%
-  filter(!is.na(longitude) & !is.na(latitude)) %>%
-  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>%
-  st_transform(27700)
-
+source('utils/read_data.R')
 
 england_sf_bng <- st_transform(england_sf, 27700)
 unique(england_sf_bng$region)

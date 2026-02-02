@@ -1,9 +1,13 @@
 library(tidyverse)
 library(readxl)
 
-accident <- read_csv('./Data/dft-road-casualty-statistics-collision-provisional-2025.csv')
+accident <- read_csv('./Data/dft-road-casualty-statistics-collision-provisional-2025.csv') %>%
+  filter(!is.na(longitude) & !is.na(latitude)) %>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>%
+  st_transform(27700)
+
 code_list_df <- read_xlsx('./Data/dft-road-casualty-statistics-road-safety-open-dataset-data-guide-2024.xlsx', sheet = "2024_code_list")
-pop_raw <- read_excel("Data/sapelsoasyoa20222024.xlsx", sheet = "Mid-2024 LSOA 2021", skip = 3)
+pop_raw <- read_excel("Data/sapelsoasyoa20222024.xlsx", sheet = "Mid-2024 LSOA 2021", skip = 3) # Population in LSOA
 
 lsoa_pop <- pop_raw %>%
   select(

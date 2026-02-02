@@ -1,9 +1,7 @@
+library(tmap)
 library(spdep)
+source('utils/read_data.R')
 
-accident <- read_csv('./Data/dft-road-casualty-statistics-collision-provisional-2025.csv') %>%
-  filter(!is.na(longitude) & !is.na(latitude)) %>%
-  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>%
-  st_transform(27700)
 accidents_lsoa <- st_join(accident, london_lsoa)
 
 lsoa_counts <- accidents_with_lsoa %>%
@@ -24,15 +22,18 @@ map1 <- tm_shape(london_lsoa_stats) +
               style = "jenks",
               palette = "Reds", 
               title = "Accidents per LSOA",
-              border.alpha = 0.1)
+              border.alpha = 0.1)+
+  add_map_decorations()
 
 map2 <- tm_shape(london_lsoa_stats) +
   tm_polygons(col = "accidents_per_1000", 
               style = "jenks",
               palette = "Reds",
-              border.alpha = 0.1)
+              border.alpha = 0.1)+
+  add_map_decorations()
 
-tmap_arrange(map1, map2, ncol = 2)
+accident_map <- tmap_arrange(map1, map2, ncol = 2)
+tmap_save(accident_map, filename = "Data/Layout/London_Accidents_Comparison.png", width = 12, height = 6, dpi = 300)
 
 # Correlation plot
 library(ggpubr)
@@ -94,13 +95,14 @@ lisa_colors <- c(
 )
 
 tmap_mode("plot")
-tm_shape(london_lsoa_stats) + 
+morans_map <- tm_shape(london_lsoa_stats) + 
   tm_polygons(col = "cluster_sig", 
               palette = lisa_colors,
               title = "Local Moran's I Clusters",
               border.alpha = 0.3) +
-  tm_layout(main.title = "Accident Hotspots in London (LISA)",
-            legend.outside = TRUE)
+  tm_layout(main.title = "Accident Hotspots in London (LISA)") +
+  add_map_decorations()
+tmap_save(morans_map, filename = "Data/Layout/Morans_map.png", width = 12, height = 6, dpi = 300)
 
 moran_plot_data <- spatial_data %>%
   st_drop_geometry() %>%
@@ -132,3 +134,30 @@ moran <- moran.plot(london_lsoa_stats$accident_count, listw = W_list)
 #   theme_bw() +
 #   theme(plot.title = element_text(hjust = 0.5, face = "bold"),
 #         legend.position = "bottom")
+
+# GI
+
+# plot the data and neighbours
+
+gi_results <- localG(london_lsoa_stats$accident_count, W_list)
+london_lsoa_stats$gstat <- as.numeric(gi_results)
+local_g_sf <- london_lsoa_stats
+
+plot(local_g_sf["gstat"], 
+     main = "Getis-Ord Gi* Statistic (Z-score)",
+     border = NA)
+
+breaks <- c(-Inf, -2.58, -1.96, -1.65, 1.65, 1.96, 2.58, Inf)
+tmap_mode("plot")
+gi_map <- tm_shape(local_g_sf) + 
+  tm_polygons("gstat", 
+              style = "fixed",
+              breaks = breaks,
+              palette = "-RdBu", 
+              midpoint = 0,
+              title = "Gi* Z-score",
+              border.alpha = 0.1) + 
+  tm_layout(main.title = "London Accidents Hot & Cold Spots")+
+  add_map_decorations()
+
+tmap_save(gi_map, filename = "Data/Layout/GI_map.png", width = 12, height = 6, dpi = 300)
