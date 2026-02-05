@@ -2,7 +2,12 @@ library(tidyverse)
 library(readxl)
 source('./utils/boundaries.R')
 
-accident <- read_csv('./Data/dft-road-casualty-statistics-collision-provisional-2025.csv') %>%
+# accident <- read_csv('./Data/dft-road-casualty-statistics-collision-provisional-2025.csv') %>%
+#   filter(!is.na(longitude) & !is.na(latitude)) %>%
+#   st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>%
+#   st_transform(27700)
+
+accident <- read_csv('./Data/dft-road-casualty-statistics-collision-1979-latest-published-year.csv') %>%
   filter(!is.na(longitude) & !is.na(latitude)) %>%
   st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>%
   st_transform(27700)
@@ -23,23 +28,22 @@ collision_codes <- code_list_df %>%
 
 mapped_df <- accident
 
-for (col_name in colnames(mapped_df)) {
-  
-  original_values <- as.character(mapped_df[[col_name]])
-  mapping <- collision_codes %>% filter(`field name` == col_name)
-  
-  # namevec: c('code' = 'label')
-  lookup_vec <- setNames(mapping$label, as.character(mapping$`code/format`))
-  mapped_values <- lookup_vec[original_values]
-  
-  matched_indices <- !is.na(mapped_values)
-  
-  if (any(matched_indices)) {
-    mapped_df[[col_name]] <- as.character(mapped_df[[col_name]])
-    mapped_df[[col_name]][matched_indices] <- mapped_values[matched_indices]
-  }
-}
+# for (col_name in colnames(mapped_df)) {
+#   
+#   original_values <- as.character(mapped_df[[col_name]])
+#   mapping <- collision_codes %>% filter(`field name` == col_name)
+#   
+#   # namevec: c('code' = 'label')
+#   lookup_vec <- setNames(mapping$label, as.character(mapping$`code/format`))
+#   mapped_values <- lookup_vec[original_values]
+#   
+#   matched_indices <- !is.na(mapped_values)
+#   
+#   if (any(matched_indices)) {
+#     mapped_df[[col_name]] <- as.character(mapped_df[[col_name]])
+#     mapped_df[[col_name]][matched_indices] <- mapped_values[matched_indices]
+#   }
+# }
 mapped_df
 
-accidents_lsoa <- st_join(accident, london_lsoa)
-
+accidents_lsoa <- st_join(mapped_df, london_lsoa, left = FALSE)
