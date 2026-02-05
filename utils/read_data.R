@@ -1,5 +1,6 @@
 library(tidyverse)
 library(readxl)
+source('./utils/boundaries.R')
 
 accident <- read_csv('./Data/dft-road-casualty-statistics-collision-provisional-2025.csv') %>%
   filter(!is.na(longitude) & !is.na(latitude)) %>%
@@ -39,3 +40,6 @@ for (col_name in colnames(mapped_df)) {
   }
 }
 mapped_df
+
+accidents_lsoa <- st_join(accident, london_lsoa)
+

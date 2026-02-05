@@ -24,6 +24,7 @@
 #   england_l2_bng <- project(england_l2, "EPSG:27700")
 # })
 
+library(sf)
 library(purrr)
 shp_path <- "/Users/wangqiqian/Downloads/LB_shp"
 shp_files <- list.files(path = shp_path, pattern = "\\.shp$", full.names = TRUE)

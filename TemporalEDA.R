@@ -1,10 +1,11 @@
 source('utils/boundaries.R')
 source('utils/read_data.R')
+source('utils/starima_package.R')
 
-mapped_df
-mapped_df%>%colnames()
+accidents_lsoa
+accidents_lsoa%>%colnames()
 
-plot_data <- mapped_df %>%
+plot_data <- accidents_lsoa %>%
   mutate(date_parsed = dmy(date), month_year = floor_date(date_parsed, "week")) %>%
   group_by(month_year, road_type) %>%
   summarise(count = n(), .groups = "drop")
@@ -22,15 +23,14 @@ ggplot(plot_data, aes(x = month_year, y = count, color = road_type, group = road
         legend.position = "bottom")
 
 day_levels <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
-mapped_df%>%
+accidents_lsoa%>%
   mutate(day_of_week = factor(day_of_week, levels = day_levels))%>%
   group_by(day_of_week, collision_severity)%>%
   summarise(count=n())%>%
   ggplot()+
   geom_bar(aes(x=day_of_week, y=count, fill=collision_severity), stat='identity', position='dodge')
 
-
-temp_data <- mapped_df %>%
+temp_data <- accidents_lsoa %>%
   mutate(date_parsed = dmy(date), month_year = floor_date(date_parsed, "day")) %>%
   group_by(month_year) %>%
   summarise(count = n(), .groups = "drop")
@@ -40,7 +40,7 @@ temp_1 <- ggplot(temp_data, aes(x = month_year, y = count)) +
   geom_point(size = 2) +
   scale_x_date(date_labels = "%Y-%m", date_breaks = "1 month") +
   labs(title = "2025 Weekly Accident Counts by Road Type",
-       x = "Month",
+       x = "Data",
        y = "Number of Accidents",
        color = "Road Type") +
   theme_minimal() +
@@ -49,24 +49,39 @@ temp_1 <- ggplot(temp_data, aes(x = month_year, y = count)) +
 
 temp_data_lag <- temp_data %>%
   arrange(month_year) %>% 
-  mutate(t = count, t_minus_1 = lag(count, n = 1))
-filtered_temp_data <- temp_data_lag%>%filter(!is.na(t_minus_1))
-temp_2 <- filtered_temp_data%>%
+  mutate(t = count, 
+         t_minus_1 = lag(count, n = 1),
+         t_minus_7 = lag(count, n = 7),
+         t_minus_28 = lag(count, n = 28))%>%
+  filter(!is.na(t_minus_1) & !is.na(t_minus_7) & !is.na(t_minus_28))
+temp_2 <- temp_data_lag%>%
   ggplot(aes(x=t, y=t_minus_1)) + 
   geom_point() + 
   labs(y="t-1") +
   geom_smooth(method="lm")+
   ggplot2::annotate("text", 
-                    x = min(filtered_temp_data$t), 
-                    y = max(filtered_temp_data$t_minus_1),
+                    x = min(temp_data_lag$t), 
+                    y = max(temp_data_lag$t_minus_1),
                     hjust = 0, vjust = 1,
-                    label = paste("r =", round(cor(filtered_temp_data$t, filtered_temp_data$t_minus_1), 3)))
+                    label = paste("r =", round(cor(temp_data_lag$t, temp_data_lag$t_minus_1), 3)))
 library(gridExtra)
 grid.arrange(temp_1, temp_2, nrow=1)
-ggsave(file = "Data/Layout/Temporal.png", arrangeGrob(grobs = c(temp_1, temp_2), ncol = 2))
+ggsave(file = "Data/Layout/Temporal.png", arrangeGrob(grobs = c(temp_1, temp_2), ncol = 2), width = 15, height = 6, dpi = 300)
 
 
 # Temporal analysis
-acf(temp_data$count, lag.max = 30, main = "Accident Counts ACF")
-pacf(temp_data$count, lag.max = 30, main = "Accident Counts PACF")
-stacf(temp_data$count, main = "Accident Counts STACF")
+acf_plot <- acf(temp_data$count, lag.max = 30, main = "Accident Counts ACF")
+pacf_plot <- pacf(temp_data$count, lag.max = 30, main = "Accident Counts PACF")
+
+# same as above
+library(forecast)
+p_acf <- ggAcf(temp_data$count, lag.max = 30) + 
+  ggtitle("Accident Counts ACF") +
+  theme_bw()
+
+p_pacf <- ggPacf(temp_data$count, lag.max = 30) + 
+  ggtitle("Accident Counts PACF") + 
+  theme_bw()
+
+acf_pacf <- grid.arrange(p_acf, p_pacf, ncol = 2)
+ggsave("Data/Layout/ACF_PACF_ggplot.png", acf_pacf, width = 10, height = 5)
