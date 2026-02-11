@@ -2,23 +2,34 @@ library(spdep)
 library(lubridate)
 source('utils/read_data.R')
 
-nb_list_msoa <- poly2nb(london_msoa_geom, queen = TRUE)
-W_list <- nb2listw(nb_list_msoa, style = "W", zero.policy = TRUE)
+cscale <- 'lad22cd'
+if (cscale == 'lad22cd') {
+  londona_geom <- london_lad_geom
+  pop <- lad_pop
+}else if (cscale == 'msoa21cd') {
+  londona_geom <- london_msoa_geom
+  pop <- msoa_pop
+} else if (cscale == 'lsoa21cd') {
+  londona_geom <- london_lsoa
+  pop <- lsoa_pop
+}
 
-ordered_msoa_ids <- london_msoa_geom$msoa21cd
+nb_list_msoa <- poly2nb(londona_geom, queen = TRUE)
+W_list <- nb2listw(nb_list_msoa, style = "W", zero.policy = TRUE)
+ordered_msoa_ids <- londona_geom[, cscale][[1]]
 
 time_scale <- "month"
-final_data <- read_final_data('MSOA', time_scale)
-final_data <- final_data %>% filter(time_date >= as.Date("2020-01-01"))
+final_data <- read_final_data('LAD', time_scale)
 # empty panel data
 min_date <- floor_date(min(final_data$time_date, na.rm=TRUE), time_scale)
 max_date <- floor_date(max(final_data$time_date, na.rm=TRUE), time_scale)
 all_dates <- seq(min_date, max_date, by = time_scale)
 
-panel_data <- expand.grid(msoa21cd = ordered_msoa_ids, time_date = all_dates) %>%
-  left_join(st_drop_geometry(final_data), by = c("msoa21cd", "time_date")) %>%
+grid_list <- setNames(list(ordered_msoa_ids), cscale)
+panel_data <- expand.grid(c(grid_list, list(time_date = all_dates))) %>%
+  left_join(st_drop_geometry(final_data), by = c(cscale, "time_date")) %>%
   mutate(accident_count = replace_na(accident_count, 0)) %>%
-  arrange(time_date, match(msoa21cd, ordered_msoa_ids))
+  arrange(time_date, match(.data[[cscale]], ordered_msoa_ids))
 
 calc_spatial_daily <- function(df_subset, w_list) {
   return(lag.listw(w_list, df_subset$count, zero.policy = TRUE))
@@ -37,8 +48,8 @@ panel_data_spatial%>%
 
 # Add temporal lag
 svr_ready_data <- panel_data_spatial %>%
-  arrange(msoa21cd, time_date) %>% 
-  group_by(msoa21cd) %>%
+  arrange(.data[[cscale]], time_date) %>% 
+  group_by(.data[[cscale]]) %>%
   mutate(
     t = accident_count,
     t_minus_1 = lag(accident_count, 1), 
@@ -88,17 +99,17 @@ test_results <- test %>%
   )
 
 top_msoa <- test_results %>%
-  group_by(msoa21cd) %>%
+  group_by(.data[[cscale]]) %>%
   summarise(total = sum(Actual)) %>%
   arrange(desc(total)) %>%
   slice(1:5) %>%
-  pull(msoa21cd)
+  pull(.data[[cscale]])
 
 plot_subset <- test_results %>%
-  filter(msoa21cd %in% top_msoa)
+  filter(.data[[cscale]] %in% top_msoa)
 
 ggplot(plot_subset, aes(x = time_date)) +
-  geom_line(aes(y = Actual, group = msoa21cd, color = msoa21cd), size = 0.5) +
-  geom_line(aes(y = Predicted, group = msoa21cd, color = msoa21cd), linetype = "dashed", size = 0.8) +
-  facet_wrap(~msoa21cd, scales = "free_y", ncol = 1) +
+  geom_line(aes(y = Actual, group = .data[[cscale]], color = .data[[cscale]]), size = 0.5) +
+  geom_line(aes(y = Predicted, group = .data[[cscale]], color = .data[[cscale]]), linetype = "dashed", size = 0.8) +
+  facet_wrap(~.data[[cscale]], scales = "free_y", ncol = 1) +
   theme_minimal()
