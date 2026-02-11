@@ -13,6 +13,7 @@ if (cscale == 'lad22cd') {
   londona_geom <- london_lsoa
   pop <- lsoa_pop
 }
+
 time_scale <- "week"
 plot_data <- accidents_joined %>%
   mutate(date_parsed = dmy(date), month_year = floor_date(date_parsed, time_scale)) %>%
