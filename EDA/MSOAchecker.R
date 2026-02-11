@@ -1,5 +1,7 @@
+library(tmap)
+source('utils/map_func.R')
 
-msoa_total_check <- msoa_daily_counts %>%
+msoa_tottmapmsoa_total_check <- msoa_daily_counts %>%
   group_by(msoa21cd) %>%
   summarise(total_count = sum(count), .groups = "drop")
 
@@ -11,7 +13,8 @@ map_for_verification <- london_lsoa %>%
 tm_shape(map_for_verification) +
   tm_fill("total_count", palette = "Reds", title = "Total Accidents") +
   tm_borders() +
-  tm_layout(title = "Total Accidents by MSOA (Joined Back to LSOA)")
+  tm_layout(title = "Total Accidents by MSOA (Joined Back to LSOA)") +
+  add_map_decorations()
 
 
 map_for_verification%>%dim()

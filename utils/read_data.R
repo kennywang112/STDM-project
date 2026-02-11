@@ -2,15 +2,11 @@ library(tidyverse)
 library(readxl)
 source('./utils/boundaries.R')
 
-# accident <- read_csv('./Data/dft-road-casualty-statistics-collision-provisional-2025.csv') %>%
-#   filter(!is.na(longitude) & !is.na(latitude)) %>%
-#   st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>%
-#   st_transform(27700)
-
 accident <- read_csv('./Data/dft-road-casualty-statistics-collision-1979-latest-published-year.csv') %>%
   filter(!is.na(longitude) & !is.na(latitude)) %>%
   st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>%
   st_transform(27700)
+accidents_joined <- st_join(accident, london_lsoa, left = FALSE)
 
 code_list_df <- read_xlsx('./Data/dft-road-casualty-statistics-road-safety-open-dataset-data-guide-2024.xlsx', sheet = "2024_code_list")
 pop_raw <- read_excel("Data/sapelsoasyoa20222024.xlsx", sheet = "Mid-2024 LSOA 2021", skip = 3) # Population in LSOA
@@ -21,12 +17,12 @@ lsoa_pop <- pop_raw %>%
     population = Total 
   )
 
-collision_codes <- code_list_df %>%
-  # filter(tolower(table) == 'collision') %>%
-  filter(!is.na(`code/format`) & !is.na(label))
-
-
-mapped_df <- accident
+# collision_codes <- code_list_df %>%
+#   # filter(tolower(table) == 'collision') %>%
+#   filter(!is.na(`code/format`) & !is.na(label))
+# 
+# 
+# mapped_df <- accident
 
 # for (col_name in colnames(mapped_df)) {
 #   
@@ -44,6 +40,44 @@ mapped_df <- accident
 #     mapped_df[[col_name]][matched_indices] <- mapped_values[matched_indices]
 #   }
 # }
-mapped_df
+# mapped_df
 
-accidents_lsoa <- st_join(mapped_df, london_lsoa, left = FALSE)
+
+lsoa_lookup <- st_drop_geometry(london_lsoa) %>% 
+  select(lsoa21cd, msoa21cd) %>% 
+  distinct()
+
+read_final_data <- function(analysis_level, time_scale = "month") {
+  if (analysis_level == "MSOA") {
+    
+    msoa_pop <- lsoa_pop %>%
+      left_join(lsoa_lookup, by = "lsoa21cd") %>%
+      group_by(msoa21cd) %>%
+      summarise(population = sum(population, na.rm = TRUE))
+  
+    accidents_agg <- accidents_joined %>%
+      st_drop_geometry() %>%
+      mutate(day_date = dmy(date)) %>%
+      mutate(time_date = floor_date(day_date, unit = time_scale)) %>%
+      count(msoa21cd, time_date, name = "accident_count")
+  
+    final_data <- london_msoa_geom %>%
+      left_join(accidents_agg, by = "msoa21cd") %>%
+      left_join(msoa_pop, by = "msoa21cd") %>%
+      mutate(accident_count = replace_na(accident_count, 0))
+    
+  } else if (analysis_level == "LSOA") {
+    
+    accidents_agg <- accidents_joined %>%
+      st_drop_geometry() %>%
+      mutate(day_date = dmy(date)) %>%
+      mutate(time_date = floor_date(day_date, unit = time_scale)) %>%
+      count(lsoa21cd, time_date, name = "accident_count")
+  
+    final_data <- london_lsoa %>%
+      select(lsoa21cd, msoa21cd, geometry) %>%
+      left_join(accidents_agg, by = "lsoa21cd") %>%
+      left_join(lsoa_pop, by = "lsoa21cd") %>%
+      mutate(accident_count = replace_na(accident_count, 0))
+  }
+}
