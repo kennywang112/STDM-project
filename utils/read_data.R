@@ -39,6 +39,9 @@ read_final_data <- function(
       left_join(lad_pop, by = "lad22cd") %>%
       mutate(accident_count = replace_na(accident_count, 0))
     
+    return_data <- list(lad_pop, final_data)
+    return(return_data)
+    
   } else if (analysis_level == "MSOA") {
     
     msoa_pop <- lsoa_pop %>%
@@ -57,6 +60,9 @@ read_final_data <- function(
       left_join(msoa_pop, by = "msoa21cd") %>%
       mutate(accident_count = replace_na(accident_count, 0))
     
+    return_data <- list(msoa_pop, final_data)
+    return(return_data)
+    
   } else if (analysis_level == "LSOA") {
     
     accidents_agg <- accidents_joined %>%
@@ -70,7 +76,10 @@ read_final_data <- function(
       left_join(accidents_agg, by = "lsoa21cd") %>%
       left_join(lsoa_pop, by = "lsoa21cd") %>%
       mutate(accident_count = replace_na(accident_count, 0))
+    
+    return(final_data)
   }
+
 }
 
 # code_list_df <- read_xlsx('./Data/dft-road-casualty-statistics-road-safety-open-dataset-data-guide-2024.xlsx', sheet = "2024_code_list")
