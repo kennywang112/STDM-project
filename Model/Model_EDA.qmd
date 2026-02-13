@@ -67,12 +67,13 @@ mse_plot
 library(tmap)
 source('../utils/map_func.R')
 spatial_error <- analyse_final_all %>%
-  group_by(lad22cd) %>%
+  group_by(.data[[cscale]]) %>%
   summarise(
     avg_residual = mean(Actual - Predicted, na.rm = TRUE),
     geometry = st_union(geometry)) %>%
   st_as_sf()
 
+tmap_mode('plot')
 error_map <- tm_basemap("CartoDB.Positron") +
   tm_shape(spatial_error) +
   tm_polygons(
@@ -116,7 +117,8 @@ diff_mat <- tail(actual_mat, n_rows) - tail(pred_mat, n_rows)
 star_mse_vec <- colMeans(diff_mat^2, na.rm = TRUE)
 
 starima_metrics <- data.frame(
-  lad22cd = names(star_mse_vec),
+  # lad22cd = names(star_mse_vec),
+  msoa21cd = names(star_mse_vec),
   mse_star = star_mse_vec)
 
 st_svr_metrics <- analyse_final_all %>%
@@ -136,40 +138,22 @@ model_comparison %>% st_drop_geometry()
 library(forcats)
 plot_data <- model_comparison %>%
   # reorder lad22cd based on mse_scr
-  mutate(lad22cd = fct_reorder(lad22cd, mse_svr)) %>%
+  # mutate(lad22cd = fct_reorder(lad22cd, mse_svr)) %>%
+  mutate(msoa21cd = fct_reorder(msoa21cd, mse_svr)) %>%
   pivot_longer(cols = c(mse_svr, mse_star), 
                names_to = "Model", 
                values_to = "MSE") %>%
   mutate(Model = ifelse(Model == "mse_svr", "SVR", "STARIMA"))
 
-area_compare <- ggplot(plot_data, aes(x = MSE, y = lad22cd)) +
-  geom_line(aes(group = lad22cd), color = "gray80", size = 1) +
+area_compare <- ggplot(plot_data, aes(x = MSE, y = msoa21cd)) +
+  geom_line(aes(group = msoa21cd), color = "gray80", size = 1) +
   geom_point(aes(color = Model), size = 1) +
   labs(title = "MSE by District: SVR vs STARIMA",
        x = "Mean Squared Error (MSE)",
        y = "District Code")
 
-ggsave(file = "../Data/Layout/area_based_two_model_compare.png", area_compare, width = 8, height = 6, dpi = 300)
-```
-
-```{r}
-analyse_final <- test_results%>%
-  group_by(.data[[cscale]])%>%
-  summarise(total_actual = sum(Actual), total_predicted = sum(Predicted))
-analyse_final_all <- test_results%>%
-  mutate(mse = (Actual - Predicted)^2)%>%
-  left_join(londona_geom, by = cscale)%>%
-  st_as_sf()
-
-predicted_line <- test_results%>%
-  group_by(time_date)%>%
-  summarise(total_actual = sum(Actual), total_predicted = sum(Predicted))%>%
-  ggplot(aes(x = time_date)) +
-  geom_line(aes(y = total_actual, color = "Actual"), size = 0.5) +
-  geom_line(aes(y = total_predicted, color = "Predicted"), linetype = "dashed", size = 0.8) +
-  theme_minimal() +
-  labs(title = "Total Actual vs Predicted Accidents Over Time", y = "Total Accidents", color = "Legend")
-
+area_compare
+# ggsave(file = "../Data/Layout/area_based_two_model_compare.png", area_compare, width = 8, height = 6, dpi = 300)
 ```
 
 ```{r}
@@ -187,10 +171,10 @@ avg_mse_svr <- round(mean(aggregate_stsvr$mse_stsvr, na.rm = TRUE), 2)
 avg_mse_starima <- round(mean(aggregate_stsvr$mse_starima, na.rm = TRUE), 2)
 mse_label <- paste0("SVR MSE: ", avg_mse_svr, "  |  STARIMA MSE: ", avg_mse_starima)
 
-compare_plot <- full_aggregate %>%
+compare_plot <- aggregate_stsvr %>%
   ggplot() +
   geom_line(aes(x=time_date, y=actual_sum, color="Actual"), size=1) +
-  geom_line(aes(x=time_date, y=predict_svr, color="SVR"), size=1) +
+  geom_line(aes(x=time_date, y=predict_stsvr, color="SVR"), size=1) +
   geom_line(aes(x=time_date, y=predict_starima, color="STARIMA"), size=1) +
   scale_color_manual(name = "Type",
                      values = c("Actual" = "#1e23b3", "SVR" = "#25b7db", "STARIMA" = "#1a633f")) +
@@ -198,5 +182,10 @@ compare_plot <- full_aggregate %>%
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-ggsave(file = "../Data/Layout/time_based_two_model_compare.png", compare_plot, width = 8, height = 6, dpi = 300)
+compare_plot
+# ggsave(file = "../Data/Layout/time_based_two_model_compare.png", compare_plot, width = 8, height = 6, dpi = 300)
+```
+
+```{r}
+ggsave(file = "../Data/Layout/SpatioTemporalCompare.png", arrangeGrob(grobs = c(area_compare, compare_plot), ncol = 2), width = 15, height = 6, dpi = 300)
 ```

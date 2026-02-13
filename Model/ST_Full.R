@@ -3,11 +3,14 @@ library(lubridate)
 source('utils/read_data.R')
 source('utils/starima_package.R')
 
+# to not make the data too much
+# week + LAD
+# month + msoa
 time_scale <- "week"
-rt <- read_final_data('LAD', time_scale)
+rt <- read_final_data('MSOA', time_scale)
 final_data <- rt[[2]]
 
-cscale <- 'lad22cd'
+cscale <- 'msoa21cd'
 if (cscale == 'lad22cd') {
   londona_geom <- london_lad_geom
   pop <- rt[[1]]
@@ -18,6 +21,7 @@ if (cscale == 'lad22cd') {
   londona_geom <- london_lsoa
   pop <- rt[[1]]
 }
+
 
 nb_list_msoa <- poly2nb(londona_geom, queen = TRUE)
 W_list <- nb2listw(nb_list_msoa, style = "W", zero.policy = TRUE)
@@ -65,4 +69,3 @@ ready_data <- panel_data_spatial %>%
 
 source('Model/STSVR.R')
 source('Model/STARIMA.R')
-

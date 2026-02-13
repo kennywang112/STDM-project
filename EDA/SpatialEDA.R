@@ -6,13 +6,13 @@ source('utils/map_func.R')
 cscale <- 'lad22cd'
 if (cscale == 'lad22cd') {
   londona_geom <- london_lad_geom
-  pop <- lad_pop
+  pop <- rt[[1]]
 }else if (cscale == 'msoa21cd') {
   londona_geom <- london_msoa_geom
-  pop <- msoa_pop
+  pop <- rt[[1]]
 } else if (cscale == 'lsoa21cd') {
   londona_geom <- london_lsoa
-  pop <- lsoa_pop
+  pop <- rt[[1]]
 }
 
 lsoa_counts <- accidents_joined %>%
@@ -28,22 +28,12 @@ london_stats <- londona_geom %>%
   mutate(accidents_per_1000 = (accident_count / population) * 1000)
 
 tmap_mode("plot")
-map1 <- tm_basemap("CartoDB.Positron") +
-  tm_shape(london_stats) +
-  tm_polygons(col = "accident_count", 
-              style = "jenks",
-              palette = "Reds", 
-              title = "Accidents per LSOA",
-              border.alpha = 0.1)+
-  add_map_decorations()
+tmap_mode("view")
+map1 <- tm_shape(london_stats) +
+  add_map_decorations_polygon("accident_count", "Accidents per LSOA")
 
-map2 <- tm_basemap("CartoDB.Positron") +
-  tm_shape(london_stats) +
-  tm_polygons(col = "accidents_per_1000", 
-              style = "jenks",
-              palette = "Reds",
-              border.alpha = 0.1)+
-  add_map_decorations()
+map2 <- tm_shape(london_stats) +
+  add_map_decorations_polygon("accidents_per_1000", "Accidents per 1000 People")
 
 accident_map <- tmap_arrange(map1, map2, ncol = 2)
 tmap_save(accident_map, filename = paste0("Data/Layout/London_Accidents_Comparison_",cscale,".png", sep=''), width = 12, height = 6, dpi = 300)
@@ -64,8 +54,7 @@ coords <- st_coordinates(st_centroid(londona_geom))
 nb_lines <- nb2lines(nb_list, coords = coords, proj4string = st_crs(londona_geom)$proj4string)
 nb_lines_sf <- st_as_sf(nb_lines)
 
-neighbor_map <- tm_basemap("CartoDB.Positron") +
-  tm_shape(londona_geom) +
+neighbor_map <- tm_shape(londona_geom) +
   tm_borders(col = "lightgrey") +
   tm_shape(nb_lines_sf) +
   tm_lines(col = "red", alpha = 0.5)+
@@ -149,9 +138,8 @@ morans_scatter <- ggplot(moran_plot_data, aes(x = z_score, y = lag_z)) +
   theme_bw() +
   theme(plot.title = element_text(hjust = 0.5, face = "bold"),
         legend.position = "bottom")
-
-map_grob <- tmap_grob(morans_map)
-final_layout <- grid.arrange(morans_scatter, map_grob, ncol = 2)
+library(gridExtra)
+final_layout <- grid.arrange(morans_scatter, tmap_grob(morans_map), ncol = 2)
 ggsave(filename = paste0("Data/Layout/Morans_map",cscale,".png", sep=''), plot = final_layout, width = 15, height = 6, dpi = 300)
 # GI
 
@@ -160,10 +148,6 @@ ggsave(filename = paste0("Data/Layout/Morans_map",cscale,".png", sep=''), plot =
 gi_results <- localG(london_stats$accidents_per_1000, W_list)
 london_stats$gstat <- as.numeric(gi_results)
 local_g_sf <- london_stats
-
-plot(local_g_sf["gstat"], 
-     main = "Getis-Ord Gi* Statistic (Z-score)",
-     border = NA)
 
 breaks <- c(-Inf, -2.58, -1.96, -1.65, 1.65, 1.96, 2.58, Inf)
 tmap_mode("plot")

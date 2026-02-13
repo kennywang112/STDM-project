@@ -1,4 +1,3 @@
-source('utils/boundaries.R')
 source('utils/read_data.R')
 source('utils/starima_package.R')
 
