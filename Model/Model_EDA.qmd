@@ -99,12 +99,12 @@ Box.test(fit.star$RES[,1], lag=1, type="Ljung")
 ## Plot result
 
 ```{r}
-matplot(cbind(pre.star$OBS[,1], pre.star$PRE[,1]), 
+matplot(cbind(pre.star$OBS[,2], pre.star$PRE[,2]), 
         type="l", lty=c(1,2), col=c("black", "red"),
         main="STARIMA: Actual (Black) vs Predicted (Red)")
 ```
 
-## Compare two model
+## Compare two models
 
 ```{r}
 actual_mat <- as.matrix(test_Z)
@@ -130,6 +130,8 @@ model_comparison <- st_svr_metrics %>%
 model_comparison %>% st_drop_geometry()
 ```
 
+## MSE compare through different area
+
 ```{r}
 library(forcats)
 plot_data <- model_comparison %>%
@@ -140,10 +142,61 @@ plot_data <- model_comparison %>%
                values_to = "MSE") %>%
   mutate(Model = ifelse(Model == "mse_svr", "SVR", "STARIMA"))
 
-ggplot(plot_data, aes(x = MSE, y = lad22cd)) +
+area_compare <- ggplot(plot_data, aes(x = MSE, y = lad22cd)) +
   geom_line(aes(group = lad22cd), color = "gray80", size = 1) +
   geom_point(aes(color = Model), size = 1) +
   labs(title = "MSE by District: SVR vs STARIMA",
        x = "Mean Squared Error (MSE)",
        y = "District Code")
+
+ggsave(file = "../Data/Layout/area_based_two_model_compare.png", area_compare, width = 8, height = 6, dpi = 300)
+```
+
+```{r}
+analyse_final <- test_results%>%
+  group_by(.data[[cscale]])%>%
+  summarise(total_actual = sum(Actual), total_predicted = sum(Predicted))
+analyse_final_all <- test_results%>%
+  mutate(mse = (Actual - Predicted)^2)%>%
+  left_join(londona_geom, by = cscale)%>%
+  st_as_sf()
+
+predicted_line <- test_results%>%
+  group_by(time_date)%>%
+  summarise(total_actual = sum(Actual), total_predicted = sum(Predicted))%>%
+  ggplot(aes(x = time_date)) +
+  geom_line(aes(y = total_actual, color = "Actual"), size = 0.5) +
+  geom_line(aes(y = total_predicted, color = "Predicted"), linetype = "dashed", size = 0.8) +
+  theme_minimal() +
+  labs(title = "Total Actual vs Predicted Accidents Over Time", y = "Total Accidents", color = "Legend")
+
+```
+
+```{r}
+
+aggregate_stsvr <- test_results%>%
+  mutate(mse = (Predicted - Actual)^2)%>%
+  group_by(time_date)%>%
+  summarise(actual_sum = sum(Actual), mse_stsvr = mean(mse), predict_stsvr = sum(Predicted))%>%
+  slice(-1)%>%
+  mutate(
+    predict_starima = predict_starima,
+    mse_starima = mse_per_time)
+
+avg_mse_svr <- round(mean(aggregate_stsvr$mse_stsvr, na.rm = TRUE), 2)
+avg_mse_starima <- round(mean(aggregate_stsvr$mse_starima, na.rm = TRUE), 2)
+mse_label <- paste0("SVR MSE: ", avg_mse_svr, "  |  STARIMA MSE: ", avg_mse_starima)
+
+compare_plot <- full_aggregate %>%
+  ggplot() +
+  geom_line(aes(x=time_date, y=actual_sum, color="Actual"), size=1) +
+  geom_line(aes(x=time_date, y=predict_svr, color="SVR"), size=1) +
+  geom_line(aes(x=time_date, y=predict_starima, color="STARIMA"), size=1) +
+  scale_color_manual(name = "Type",
+                     values = c("Actual" = "#1e23b3", "SVR" = "#25b7db", "STARIMA" = "#1a633f")) +
+  labs(title="ST-SVR vs STARIMA Prediction", subtitle = mse_label, y="Accidents") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggsave(file = "../Data/Layout/time_based_two_model_compare.png", compare_plot, width = 8, height = 6, dpi = 300)
 ```

@@ -30,3 +30,4 @@ test_results <- test %>%
   mutate(
     Predicted = predictions, 
     Actual = accident_count)
+
