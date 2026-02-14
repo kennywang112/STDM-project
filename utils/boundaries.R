@@ -2,6 +2,7 @@ library(sf)
 library(purrr)
 shp_path <- "./Data/LB_shp"
 shp_files <- list.files(path = shp_path, pattern = "\\.shp$", full.names = TRUE)
+
 london_lsoa <- map_dfr(shp_files, st_read, quiet = TRUE) 
   
 london_msoa_geom <- london_lsoa %>%
@@ -13,4 +14,4 @@ london_lad_geom <- london_lsoa %>%
   summarise(geometry = st_union(geometry), .groups = "drop")
 
 # This is the new on for testing england
-# london_lad_geom <- st_read('./Data/Local_Authority_Districts_May_2024_Boundaries_UK_BFE_5988953988717086591.csv')
+england_lad_geom <- st_read('./Data/Local_Authority_Districts_May_2024_Boundaries_UK_BFE_-5758551109064458912/LAD_MAY_2024_UK_BFE.shp')

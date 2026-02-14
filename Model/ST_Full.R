@@ -5,38 +5,37 @@ source('utils/starima_package.R')
 
 # to not make the data too much
 # week + LAD
-# month + msoa
-time_scale <- "week"
-rt <- read_final_data('MSOA', time_scale)
+# month + MSOA
+time_scale <- "month"
+rt <- read_final_data('LAD', time_scale)
 final_data <- rt[[2]]
 
-cscale <- 'msoa21cd'
+cscale <- 'lad22cd'
 if (cscale == 'lad22cd') {
-  londona_geom <- london_lad_geom
+  london_geom <- london_lad_geom
   pop <- rt[[1]]
 }else if (cscale == 'msoa21cd') {
-  londona_geom <- london_msoa_geom
+  london_geom <- london_msoa_geom
   pop <- rt[[1]]
 } else if (cscale == 'lsoa21cd') {
-  londona_geom <- london_lsoa
+  london_geom <- london_lsoa
   pop <- rt[[1]]
 }
 
-
-nb_list_msoa <- poly2nb(londona_geom, queen = TRUE)
-W_list <- nb2listw(nb_list_msoa, style = "W", zero.policy = TRUE)
-ordered_msoa_ids <- londona_geom[, cscale][[1]]
+nb_list <- poly2nb(london_geom, queen = TRUE)
+W_list <- nb2listw(nb_list, style = "W", zero.policy = TRUE)
+ordered_ids <- london_geom[, cscale][[1]]
 
 # empty panel data
 min_date <- floor_date(min(final_data$time_date, na.rm=TRUE), time_scale)
 max_date <- floor_date(max(final_data$time_date, na.rm=TRUE), time_scale)
 all_dates <- seq(min_date, max_date, by = time_scale)
 
-grid_list <- setNames(list(ordered_msoa_ids), cscale)
+grid_list <- setNames(list(ordered_ids), cscale)
 panel_data <- expand.grid(c(grid_list, list(time_date = all_dates))) %>%
   left_join(st_drop_geometry(final_data), by = c(cscale, "time_date")) %>%
   mutate(accident_count = replace_na(accident_count, 0)) %>%
-  arrange(time_date, match(.data[[cscale]], ordered_msoa_ids))
+  arrange(time_date, match(.data[[cscale]], ordered_ids))
 
 calc_spatial_daily <- function(df_subset, w_list) {
   return(lag.listw(w_list, df_subset$count, zero.policy = TRUE))
@@ -69,3 +68,4 @@ ready_data <- panel_data_spatial %>%
 
 source('Model/STSVR.R')
 source('Model/STARIMA.R')
+

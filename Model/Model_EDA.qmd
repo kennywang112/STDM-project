@@ -33,16 +33,21 @@ analyse_final <- test_results%>%
   group_by(.data[[cscale]])%>%
   summarise(total_actual = sum(Actual), total_predicted = sum(Predicted))
 analyse_final_all <- test_results%>%
-  mutate(mse = (Actual - Predicted)^2)%>%
-  left_join(londona_geom, by = cscale)%>%
+  mutate(
+    mse = (Actual - Predicted)^2,
+    mse_t = (Actual - Predicted_t)^2
+         )%>%
+  left_join(london_geom, by = cscale)%>%
   st_as_sf()
 
 predicted_line <- test_results%>%
   group_by(time_date)%>%
-  summarise(total_actual = sum(Actual), total_predicted = sum(Predicted))%>%
+  summarise(
+    total_actual = sum(Actual), total_predicted = sum(Predicted), total_predicted_t = sum(Predicted_t))%>%
   ggplot(aes(x = time_date)) +
   geom_line(aes(y = total_actual, color = "Actual"), size = 0.5) +
   geom_line(aes(y = total_predicted, color = "Predicted"), linetype = "dashed", size = 0.8) +
+  geom_line(aes(y = total_predicted_t, color = "Predicted_t"), linetype = "dashed", size = 0.8) +
   theme_minimal() +
   labs(title = "Total Actual vs Predicted Accidents Over Time", y = "Total Accidents", color = "Legend")
 predicted_line
@@ -117,8 +122,8 @@ diff_mat <- tail(actual_mat, n_rows) - tail(pred_mat, n_rows)
 star_mse_vec <- colMeans(diff_mat^2, na.rm = TRUE)
 
 starima_metrics <- data.frame(
-  # lad22cd = names(star_mse_vec),
-  msoa21cd = names(star_mse_vec),
+  lad22cd = names(star_mse_vec),
+  # msoa21cd = names(star_mse_vec),
   mse_star = star_mse_vec)
 
 st_svr_metrics <- analyse_final_all %>%
@@ -138,17 +143,17 @@ model_comparison %>% st_drop_geometry()
 library(forcats)
 plot_data <- model_comparison %>%
   # reorder lad22cd based on mse_scr
-  # mutate(lad22cd = fct_reorder(lad22cd, mse_svr)) %>%
-  mutate(msoa21cd = fct_reorder(msoa21cd, mse_svr)) %>%
+  mutate(lad22cd = fct_reorder(lad22cd, mse_svr)) %>%
+  # mutate(msoa21cd = fct_reorder(msoa21cd, mse_svr)) %>%
   pivot_longer(cols = c(mse_svr, mse_star), 
                names_to = "Model", 
                values_to = "MSE") %>%
   mutate(Model = ifelse(Model == "mse_svr", "SVR", "STARIMA"))
 
-area_compare <- ggplot(plot_data, aes(x = MSE, y = msoa21cd)) +
-  geom_line(aes(group = msoa21cd), color = "gray80", size = 1) +
+area_compare <- ggplot(plot_data, aes(x = MSE, y = .data[[cscale]])) +
+  geom_line(aes(group = .data[[cscale]]), color = "gray80", size = 1) +
   geom_point(aes(color = Model), size = 1) +
-  labs(title = "MSE by District: SVR vs STARIMA",
+  labs(title = "MSE by District: STSVR vs STARIMA",
        x = "Mean Squared Error (MSE)",
        y = "District Code")
 
@@ -159,25 +164,39 @@ area_compare
 ```{r}
 
 aggregate_stsvr <- test_results%>%
-  mutate(mse = (Predicted - Actual)^2)%>%
+  mutate(
+    mse = (Predicted - Actual)^2,
+    mse_t = (Predicted_t - Actual)^2
+    )%>%
   group_by(time_date)%>%
-  summarise(actual_sum = sum(Actual), mse_stsvr = mean(mse), predict_stsvr = sum(Predicted))%>%
+  summarise(
+    actual_sum = sum(Actual), 
+    mse_stsvr = mean(mse), predict_stsvr = sum(Predicted),
+    mse_tsvr = mean(mse_t), predict_tsvr = sum(Predicted_t)
+    )%>%
   slice(-1)%>%
   mutate(
-    predict_starima = predict_starima,
-    mse_starima = mse_per_time)
+    predict_starima = predict_starima, mse_starima = mse_per_time,
+    predict_arima = predict_arima, mse_arima = pred_se)
 
 avg_mse_svr <- round(mean(aggregate_stsvr$mse_stsvr, na.rm = TRUE), 2)
+avg_mse_tsvr <- round(mean(aggregate_stsvr$mse_tsvr, na.rm = TRUE), 2)
 avg_mse_starima <- round(mean(aggregate_stsvr$mse_starima, na.rm = TRUE), 2)
-mse_label <- paste0("SVR MSE: ", avg_mse_svr, "  |  STARIMA MSE: ", avg_mse_starima)
+avg_mse_arima <- round(mean(aggregate_stsvr$mse_arima, na.rm = TRUE), 2)
+mse_label <- paste0("STSVR MSE: ", avg_mse_svr, 
+                    "  |  TSVR MSE: ", avg_mse_tsvr,
+                    "  |  STARIMA MSE: ", avg_mse_starima,
+                    "  |  ARIMA MSE: ", avg_mse_arima)
 
 compare_plot <- aggregate_stsvr %>%
   ggplot() +
   geom_line(aes(x=time_date, y=actual_sum, color="Actual"), size=1) +
-  geom_line(aes(x=time_date, y=predict_stsvr, color="SVR"), size=1) +
-  geom_line(aes(x=time_date, y=predict_starima, color="STARIMA"), size=1) +
+  geom_line(aes(x=time_date, y=predict_stsvr, color="STSVR"), size=1, linetype = "dashed") +
+  geom_line(aes(x=time_date, y=predict_tsvr, color="TSVR"), size=1, linetype = "dashed") +
+  geom_line(aes(x=time_date, y=predict_starima, color="STARIMA"), size=1, linetype = "dashed") +
+  geom_line(aes(x=time_date, y=predict_arima, color="ARIMA"), size=1, linetype = "dashed") +
   scale_color_manual(name = "Type",
-                     values = c("Actual" = "#1e23b3", "SVR" = "#25b7db", "STARIMA" = "#1a633f")) +
+                     values = c("Actual" = "#1e23b3", "STSVR" = "#63e0ff", "STARIMA" = "#2fad6e", "TSVR" = "#25b7db", "ARIMA" = "#1a633f")) +
   labs(title="ST-SVR vs STARIMA Prediction", subtitle = mse_label, y="Accidents") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))

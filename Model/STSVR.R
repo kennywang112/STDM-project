@@ -10,6 +10,8 @@ train_y <- train$accident_count
 test_X <- as.matrix(test %>% select(t_minus_1, t_minus_7, spatial_lag_1))
 test_y <- test$accident_count
 
+train_X_t <- as.matrix(train%>%select(t_minus_1, t_minus_7))
+test_X_t <- as.matrix(test%>%select(t_minus_1, t_minus_7))
 
 ggplot(data.frame(accidents = train_y), aes(x = accidents)) +
   geom_histogram(binwidth = 1, fill = "steelblue", color = "white") +
@@ -17,17 +19,28 @@ ggplot(data.frame(accidents = train_y), aes(x = accidents)) +
 
 ### ksvm
 library(kernlab)
-model_svr_st <- ksvm(x = train_X, 
-                     y = train_y, 
-                     type = "eps-svr", 
-                     kernel = "rbfdot",
-                     C = 1, 
-                     epsilon = 0.1)
 
-predictions <- predict(model_svr_st, test_X)
+train_ksvm <- function(
+    x, y, test
+    ) {
+  model <- ksvm(x = x, 
+                y = y, 
+                type = "eps-svr", 
+                kernel = "rbfdot",
+                C = 1, 
+                epsilon = 0.1)
+  
+  predictions <- predict(model, test)
+  
+  return(predictions)
+}
+
+predictions_st <- train_ksvm(train_X, train_y, test_X)
+predictions_t <- train_ksvm(train_X_t, train_y, test_X_t)
 
 test_results <- test %>%
   mutate(
-    Predicted = predictions, 
+    Predicted = predictions_st,
+    Predicted_t = predictions_t,
     Actual = accident_count)
 
