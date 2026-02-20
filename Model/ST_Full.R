@@ -68,4 +68,5 @@ ready_data <- panel_data_spatial %>%
 
 source('Model/STSVR.R')
 source('Model/STARIMA.R')
+source('Model/STGCN.R')
 

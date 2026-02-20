@@ -3,11 +3,13 @@ library(readxl)
 source('./utils/boundaries.R')
 
 accident <- read_csv('./Data/dft-road-casualty-statistics-collision-1979-latest-published-year.csv') %>%
+  filter(collision_year >= 2020)%>%
   filter(!is.na(longitude) & !is.na(latitude)) %>%
-  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+
+london_lsoa_4326 <- st_transform(london_lsoa, 4326)
+accidents_joined <- st_join(accident, london_lsoa_4326, left = FALSE)%>%
   st_transform(27700)
-accidents_joined <- st_join(accident, london_lsoa, left = FALSE)%>%
-  filter(collision_year >= 2020)
 
 pop_raw <- read_excel("Data/sapelsoasyoa20222024.xlsx", sheet = "Mid-2024 LSOA 2021", skip = 3) # Population in LSOA
 

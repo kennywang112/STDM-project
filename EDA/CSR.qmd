@@ -1,0 +1,57 @@
+---
+title: "CSR"
+format: html
+---
+
+```{r}
+
+library(sf)
+library(tidyverse)
+library(spatstat)
+
+accident_projected <- accident %>%
+  st_transform(27700)
+
+window <- as.owin(st_bbox(accident_projected))
+acc_coords <- st_coordinates(accident_projected)
+acc_ppp <- ppp(x = acc_coords[,1], y = acc_coords[,2], window = window)
+```
+
+```{r}
+acc_sample <- acc_ppp[sample(1:acc_ppp$n, 10000)]
+```
+
+## Ripley's K & L-function
+
+```{r}
+K_env <- envelope(acc_sample, Kest, nsim = 39, rank = 1, 
+                  correction = "Ripley", global = TRUE)
+L_env <- envelope(acc_sample, Lest, nsim = 39, rank = 1, 
+                  correction = "Ripley", global = TRUE)
+```
+
+```{r}
+plot(K_env, 
+     xlim = c(0, 1000),
+     main = "Multi-scale Spatial Analysis: Empirical Ripley's K-function",
+     ylab = expression(italic(K)(r)), 
+     xlab = "Distance r (meters)",
+     legend = TRUE)
+
+plot(L_env, . - r ~ r, 
+     xlim = c(0, 1000),
+     main = "Multi-scale Spatial Clustering Analysis of Traffic Accidents",
+     sub = "with 95% Global Confidence Envelope",
+     ylab = expression(italic(L)(r) - r), 
+     xlab = "Distance r (meters)",
+     legend = FALSE)
+legend("topleft", 
+       legend = c(expression(hat(L)[obs](r)-r), 
+                  expression(L[theo](r)-r), 
+                  "95% Confidence Envelope"),
+       col = c("black", "red", "grey"), 
+       lty = c(1, 2, 1), 
+       lwd = c(1, 1, 10), 
+       cex = 0.7, 
+       bty = "n")
+```

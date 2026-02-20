@@ -9,3 +9,8 @@ This project aims to analyse traffic accidents in London, including spatio-tempo
 -   [Traffic flow](https://roadtraffic.dft.gov.uk/downloads)
 -   [Lsoa Population](https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/lowersuperoutputareamidyearpopulationestimates): sapelsoasyoa20222024
 -   [England LAD Boundary](https://geoportal.statistics.gov.uk/datasets/ons::local-authority-districts-may-2024-boundaries-uk-bfe-2/about): Local_Authority_Districts_May_2024_Boundaries_UK_BFE_5988953988717086591
+
+## Files
+
+1.  `ST_Full.R` is used to construct the data for models, it runs `read_data.R` in utils and run models from `STSVR.R` and `STARIMA.R`
+2.  `TemporalEDA.R` and `SpatialEDA.R` are used for temporal and spatial exploratory data analysis respectively.
