@@ -165,8 +165,8 @@ diff_mat <- tail(actual_mat, n_rows) - tail(pred_mat, n_rows)
 star_mse_vec <- colMeans(diff_mat^2, na.rm = TRUE)
 
 starima_metrics <- data.frame(
-  lad22cd = names(star_mse_vec),
-  # msoa21cd = names(star_mse_vec),
+  #lad22cd = names(star_mse_vec),
+  msoa21cd = names(star_mse_vec),
   mse_star = star_mse_vec)
 
 stsvr_metrics <- analyse_final_all %>%
@@ -191,8 +191,8 @@ stgcn_metrics <- analyse_final_all_gcn %>%
 library(forcats)
 plot_data <- model_comparison %>%
   # reorder lad22cd based on mse_scr
-  mutate(lad22cd = fct_reorder(lad22cd, mse_svr)) %>%
-  # mutate(msoa21cd = fct_reorder(msoa21cd, mse_svr)) %>%
+  # mutate(lad22cd = fct_reorder(lad22cd, mse_svr)) %>%
+  mutate(msoa21cd = fct_reorder(msoa21cd, mse_svr)) %>%
   pivot_longer(cols = c(mse_svr, mse_star), 
                names_to = "Model", 
                values_to = "MSE") %>%
@@ -260,7 +260,10 @@ compare_plot <- aggregate_all_models %>%
   geom_line(aes(x=time_date, y=predict_stgcn, color="STGCN"), size=1, linetype = "dashed") +
   geom_line(aes(x=time_date, y=predict_tgcn, color="TGCN"), size=1, linetype = "dashed") +
   scale_color_manual(name = "Type",
-                     values = c("Actual" = "#1e23b3", "STSVR" = "#63e0ff", "STARIMA" = "#2fad6e", "TSVR" = "#25b7db", "ARIMA" = "#1a633f")) +
+                     values = c("Actual" = "#1e23b3", 
+                                "STSVR" = "#63e0ff", "TSVR" = "#25b7db",
+                                "STARIMA" = "#2fad6e", "ARIMA" = "#1a633f",
+                                "TGCN" = "#d465d6", "STGCN" = "#9b819c")) +
   labs(title="ST-SVR vs STARIMA Prediction", subtitle = mse_label, y="Accidents") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))

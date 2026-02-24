@@ -1,4 +1,5 @@
 # This is extension in ST_SVR
+
 Z_matrix <- ready_data %>%
   select(time_date, !!sym(cscale), accident_count) %>%
   pivot_wider(names_from = !!sym(cscale), values_from = accident_count, values_fill = 0) %>%

@@ -7,10 +7,10 @@ source('utils/starima_package.R')
 # week + LAD
 # month + MSOA
 time_scale <- "month"
-rt <- read_final_data('LAD', time_scale)
+rt <- read_final_data('MSOA', time_scale)
 final_data <- rt[[2]]
 
-cscale <- 'lad22cd'
+cscale <- 'msoa21cd'
 if (cscale == 'lad22cd') {
   london_geom <- london_lad_geom
   pop <- rt[[1]]
@@ -65,6 +65,16 @@ ready_data <- panel_data_spatial %>%
   ) %>%
   ungroup() %>%
   filter(!is.na(t_minus_1) & !is.na(t_minus_7) & !is.na(spatial_lag_1))
+
+normalise_f <- function(x) {
+  (x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
+}
+ready_data <- ready_data %>%
+  mutate(
+    accident_count = normalise_f(accident_count),
+    t_minus_1 = normalise_f(t_minus_1),
+    t_minus_7 = normalise_f(t_minus_7),
+    spatial_lag_1 = normalise_f(spatial_lag_1))
 
 source('Model/STSVR.R')
 source('Model/STARIMA.R')
