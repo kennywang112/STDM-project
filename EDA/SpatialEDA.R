@@ -3,7 +3,7 @@ library(spdep)
 source('utils/read_data.R')
 source('utils/map_func.R')
 
-cscale <- 'lad22cd'
+cscale <- 'msoa21cd'
 if (cscale == 'lad22cd') {
   londona_geom <- london_lad_geom
   pop <- rt[[1]]
@@ -15,27 +15,27 @@ if (cscale == 'lad22cd') {
   pop <- rt[[1]]
 }
 
-lsoa_counts <- accidents_joined %>%
+msoa_counts <- accidents_joined %>%
   st_drop_geometry() %>%   
   filter(!is.na(.data[[cscale]])) %>%
   group_by(.data[[cscale]]) %>%
   summarise(accident_count = n())
 
 london_stats <- londona_geom %>%
-  left_join(lsoa_counts, by = cscale) %>%
+  left_join(msoa_counts, by = cscale) %>%
   mutate(accident_count = replace_na(accident_count, 0))%>%
   left_join(pop, by=cscale)%>%
   mutate(accidents_per_1000 = (accident_count / population) * 1000)
 
 tmap_mode("plot")
 tmap_mode("view")
-map1 <- tm_shape(london_stats) +
+accident_count_map <- tm_shape(london_stats) +
   add_map_decorations_polygon("accident_count", "Accidents per LSOA")
 
-map2 <- tm_shape(london_stats) +
+accident_rate <- tm_shape(london_stats) +
   add_map_decorations_polygon("accidents_per_1000", "Accidents per 1000 People")
 
-accident_map <- tmap_arrange(map1, map2, ncol = 2)
+accident_map <- tmap_arrange(accident_count_map, accident_rate, ncol = 2)
 tmap_save(accident_map, filename = paste0("Data/Layout/London_Accidents_Comparison_",cscale,".png", sep=''), width = 12, height = 6, dpi = 300)
 
 # Correlation plot
@@ -140,7 +140,7 @@ morans_scatter <- ggplot(moran_plot_data, aes(x = z_score, y = lag_z)) +
         legend.position = "bottom")
 library(gridExtra)
 final_layout <- grid.arrange(morans_scatter, tmap_grob(morans_map), ncol = 2)
-ggsave(filename = paste0("Data/Layout/Morans_map",cscale,".png", sep=''), plot = final_layout, width = 15, height = 6, dpi = 300)
+ggsave(filename = paste0("Data/Layout/Morans_map_",cscale,".png", sep=''), plot = final_layout, width = 15, height = 6, dpi = 300)
 # GI
 
 # plot the data and neighbours
@@ -163,4 +163,7 @@ gi_map <- tm_basemap("CartoDB.Positron") +
   tm_layout(main.title = "London Accidents Hot & Cold Spots")+
   add_map_decorations()
 
-tmap_save(gi_map, filename = paste0("Data/Layout/GI_map",cscale,".png", sep=''), width = 12, height = 6, dpi = 300)
+tmap_save(gi_map, filename = paste0("Data/Layout/GI_map_",cscale,".png", sep=''), width = 12, height = 6, dpi = 300)
+
+gi_accrate_layout <- tmap_arrange(accident_rate, gi_map, ncol = 2)
+tmap_save(gi_accrate_layout, filename = paste0("Data/Layout/GI_AccRate_",cscale,".png", sep=''), width = 12, height = 6, dpi = 300)

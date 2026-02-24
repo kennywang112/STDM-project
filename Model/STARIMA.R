@@ -40,3 +40,17 @@ predict_arima <- as.numeric(pre.ar$pred)%>%
   tail(length(predict_starima))
 pred_se <- as.numeric(pre.ar$se)%>%
   tail(length(predict_starima))
+
+actual_mat <- as.matrix(test_Z)
+pred_mat <- as.matrix(pre.star$PRE)
+n_rows <- min(nrow(actual_mat), nrow(pred_mat))
+diff_mat <- tail(actual_mat, n_rows) - tail(pred_mat, n_rows)
+star_mse_vec <- colMeans(diff_mat^2, na.rm = TRUE)
+
+starima_metrics <- data.frame(
+  #lad22cd = names(star_mse_vec),
+  msoa21cd = names(star_mse_vec),
+  mse_star = star_mse_vec)
+
+# starima_metrics%>%write.csv("./Data/CalculatedData/test_results_starima.csv")
+# starima_metrics <- read.csv("./Data/CalculatedData/test_results_starima.csv")

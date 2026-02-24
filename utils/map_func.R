@@ -7,7 +7,7 @@ add_map_decorations_polygon <- function(col, title) {
     add_map_decorations()
 }
 
-add_map_decorations <- function(col, title) {
+add_map_decorations <- function() {
   tm_basemap("CartoDB.Positron") +
     tm_compass(position = c("right", "top")) +
     tm_scale_bar(position = c("left", "bottom")) +
