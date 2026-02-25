@@ -1,5 +1,6 @@
 ### ksvm
 library(kernlab)
+library(parallel)
 
 train_ksvm <- function(
     x, y, test
@@ -16,8 +17,20 @@ train_ksvm <- function(
   return(predictions)
 }
 
-predictions_st <- train_ksvm(train_X, train_y, test_X)
-predictions_t <- train_ksvm(train_X_t, train_y, test_X_t)
+
+results <- mclapply(
+  list(
+    list(x = train_X, y = train_y, test = test_X),
+    list(x = train_X_t, y = train_y, test = test_X_t)
+  ),
+  function(data) {
+    train_ksvm(data$x, data$y, data$test)
+  },
+  mc.cores = 6
+)
+
+predictions_st <- results[[1]]
+predictions_t <- results[[2]]
 
 test_results <- test %>%
   mutate(
