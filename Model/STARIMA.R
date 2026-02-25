@@ -28,6 +28,12 @@ predict_starima <- rowSums(pre.star$PRE)
 actual_starima <- rowSums(test_Z)
 mse_per_time <- rowMeans((actual_mat - predict_mat)^2, na.rm = TRUE)
 
+actual_mat <- as.matrix(test_Z)
+pred_mat <- as.matrix(pre.star$PRE)
+n_rows <- min(nrow(actual_mat), nrow(pred_mat))
+diff_mat <- tail(actual_mat, n_rows) - tail(pred_mat, n_rows)
+star_mse_vec <- colMeans(diff_mat^2, na.rm = TRUE)
+
 # ARIMA
 train_total_series <- rowSums(train_Z)
 test_total_series  <- rowSums(test_Z)
@@ -38,19 +44,30 @@ n_ahead <- length(test_total_series)
 pre.ar <- predict(fit_total, n.ahead = n_ahead)
 predict_arima <- as.numeric(pre.ar$pred)%>%
   tail(length(predict_starima))
-pred_se <- as.numeric(pre.ar$se)%>%
-  tail(length(predict_starima))
 
-actual_mat <- as.matrix(test_Z)
-pred_mat <- as.matrix(pre.star$PRE)
-n_rows <- min(nrow(actual_mat), nrow(pred_mat))
-diff_mat <- tail(actual_mat, n_rows) - tail(pred_mat, n_rows)
-star_mse_vec <- colMeans(diff_mat^2, na.rm = TRUE)
+N_nodes <- ncol(train_Z)
+predict_arima_per_region <- predict_arima / N_nodes
+
+n_rows_arima <- length(predict_arima)
+pred_arima_mat <- matrix(
+  rep(predict_arima_per_region, times = N_nodes), 
+  nrow = n_rows_arima, 
+  ncol = N_nodes
+)
+
+actual_mat_aligned <- tail(actual_mat, n_rows_arima)
+
+pred_se <- rowMeans((actual_mat_aligned - pred_arima_mat)^2, na.rm = TRUE)
+
+diff_arima_mat <- actual_mat_aligned - pred_arima_mat
+arima_mse_vec <- colMeans(diff_arima_mat^2, na.rm = TRUE)
 
 starima_metrics <- data.frame(
   #lad22cd = names(star_mse_vec),
   msoa21cd = names(star_mse_vec),
-  mse_star = star_mse_vec)
+  mse_star = star_mse_vec,
+  mse_arima = arima_mse_vec
+)
 
 # starima_metrics%>%write.csv("./Data/CalculatedData/test_results_starima.csv")
 # starima_metrics <- read.csv("./Data/CalculatedData/test_results_starima.csv")

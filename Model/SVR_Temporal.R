@@ -1,6 +1,7 @@
 # Extended EDA for temporal patterns, this need to change because it only consider temporal
-
+library(sf)
 library(kernlab)
+library(tidyverse)
 
 temp_data_lag <- temp_data %>%
   st_drop_geometry()%>%

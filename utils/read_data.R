@@ -2,14 +2,16 @@ library(tidyverse)
 library(readxl)
 source('./utils/boundaries.R')
 
-accident <- read_csv('./Data/dft-road-casualty-statistics-collision-1979-latest-published-year.csv') %>%
-  filter(collision_year >= 2020)%>%
-  filter(!is.na(longitude) & !is.na(latitude)) %>%
-  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+# accident <- read_csv('./Data/dft-road-casualty-statistics-collision-1979-latest-published-year.csv') %>%
+#   filter(collision_year >= 2000)%>%
+#   filter(!is.na(longitude) & !is.na(latitude)) %>%
+#   st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+# st_write(accident, "./Data/accident_2000.gpkg", delete_dsn = TRUE)
+# accident <- st_read("./Data/accident_2000.gpkg")
 
 london_lsoa_4326 <- st_transform(london_lsoa, 4326)
-accidents_joined <- st_join(accident, london_lsoa_4326, left = FALSE)%>%
-  st_transform(27700)
+# accidents_joined <- st_join(accident, london_lsoa_4326, left = FALSE)%>%
+#   st_transform(27700)
 
 pop_raw <- read_excel("Data/sapelsoasyoa20222024.xlsx", sheet = "Mid-2024 LSOA 2021", skip = 3) # Population in LSOA
 
@@ -81,8 +83,9 @@ read_final_data <- function(
     
     return(final_data)
   }
-
 }
+
+
 
 # code_list_df <- read_xlsx('./Data/dft-road-casualty-statistics-road-safety-open-dataset-data-guide-2024.xlsx', sheet = "2024_code_list")
 # collision_codes <- code_list_df %>%

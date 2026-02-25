@@ -27,6 +27,7 @@ ggplot(plot_subset, aes(x = time_date)) +
 ```
 
 ## Plot result
+
 ```{r}
 analyse_final_all_stsvr <- test_results%>%
   mutate(
@@ -37,7 +38,7 @@ analyse_final_all_stsvr <- test_results%>%
 
 analyse_final_all_stgcn <- test_results_stgcn%>%
   mutate(
-    mse = (Actual - Predicted_sgcn)^2,
+    mse = (Actual - Predicted_ann)^2,
     mse_t = (Actual - Predicted_stgcn)^2)%>%
   left_join(london_geom, by = cscale)%>%
   st_as_sf()
@@ -47,6 +48,7 @@ analyse_final_all <- analyse_final_all_stsvr
 
 ```{r}
 predicted_line <- test_results%>%
+  mutate(time_date = as.Date(time_date)) %>%
   group_by(time_date)%>%
   summarise(
     total_actual = sum(Actual), total_predicted = sum(Predicted), total_predicted_t = sum(Predicted_t))%>%
@@ -139,17 +141,18 @@ ggplot(plot_subset, aes(x = time_date)) +
 ```{r}
 analyse_final_all_gcn <- test_results_stgcn%>%
   mutate(
-    mse_sgcn = (Actual - Predicted_sgcn)^2,
+    mse_ann = (Actual - Predicted_ann)^2,
     mse_stgcn = (Actual - Predicted_stgcn)^2)%>%
   left_join(london_geom, by = cscale)%>%
   st_as_sf()
 
 predicted_line <- test_results_stgcn%>%
+  mutate(time_date = as.Date(time_date)) %>%
   group_by(time_date)%>%
-  summarise(total_actual = sum(Actual), total_predicted_sgcn = sum(Predicted_sgcn), total_predicted_stgcn = sum(Predicted_stgcn))%>%
+  summarise(total_actual = sum(Actual), total_predicted_ann = sum(Predicted_ann), total_predicted_stgcn = sum(Predicted_stgcn))%>%
   ggplot(aes(x = time_date)) +
   geom_line(aes(y = total_actual, color = "Actual"), size = 0.5) +
-  geom_line(aes(y = total_predicted_sgcn, color = "Predicted SGCN"), linetype = "dashed", size = 0.8) +
+  geom_line(aes(y = total_predicted_ann, color = "Predicted SGCN"), linetype = "dashed", size = 0.8) +
   geom_line(aes(y = total_predicted_stgcn, color = "Predicted STGCN"), linetype = "dashed", size = 0.8) +
   theme_minimal() +
   labs(title = "Total Actual vs Predicted Accidents Over Time", y = "Total Accidents", color = "Legend")
@@ -166,43 +169,17 @@ stsvr_metrics <- analyse_final_all %>%
 
 model_comparison <- stsvr_metrics %>%
   left_join(starima_metrics, by = cscale)
-```
 
-## MSE compare through different area
-
-```{r}
-library(forcats)
-plot_data <- model_comparison %>%
-  # reorder lad22cd based on mse_scr
-  # mutate(lad22cd = fct_reorder(lad22cd, mse_svr)) %>%
-  mutate(msoa21cd = fct_reorder(msoa21cd, mse_svr)) %>%
-  pivot_longer(cols = c(mse_svr, mse_star), 
-               names_to = "Model", 
-               values_to = "MSE") %>%
-  mutate(Model = ifelse(Model == "mse_svr", "SVR", "STARIMA"))
-
-area_compare <- ggplot(plot_data, aes(x = MSE, y = .data[[cscale]])) +
-  geom_line(aes(group = .data[[cscale]]), color = "gray80", size = 1) +
-  geom_point(aes(color = Model), size = 1) +
-  labs(title = "MSE by District: STSVR vs STARIMA",
-       x = "Mean Squared Error (MSE)",
-       y = "District Code")
-
-area_compare
-# ggsave(file = "../Data/Layout/area_based_two_model_compare.png", area_compare, width = 8, height = 6, dpi = 300)
-```
-
-```{r}
 test_results_combined <- test_results %>%
   mutate(
-    Predicted_SGCN = test_results_stgcn$Predicted_sgcn,
+    Predicted_ANN = test_results_stgcn$Predicted_ann,
     Predicted_STGCN = test_results_stgcn$Predicted_stgcn
   )
 aggregate_all_models <- test_results_combined %>%
   mutate(
     mse = (Predicted - Actual)^2,
     mse_t = (Predicted_t - Actual)^2, 
-    mse_sgcn = (Predicted_SGCN - Actual)^2, 
+    mse_ann = (Predicted_ANN - Actual)^2, 
     mse_stgcn = (Predicted_STGCN - Actual)^2) %>%
   group_by(time_date) %>%
   summarise(
@@ -210,14 +187,17 @@ aggregate_all_models <- test_results_combined %>%
     mse_stsvr_mean = mean(mse), predict_stsvr = sum(Predicted),
     mse_tsvr_mean = mean(mse_t), predict_tsvr = sum(Predicted_t),
     mse_stgcn_mean = mean(mse_stgcn), predict_stgcn = sum(Predicted_STGCN),
-    mse_sgcn_mean = mean(mse_sgcn), predict_sgcn = sum(Predicted_SGCN)) %>%
+    mse_ann_mean = mean(mse_ann), predict_ann = sum(Predicted_ANN)) %>%
   slice(-1) %>%
   mutate(
     predict_starima = predict_starima, mse_starima_mean = mse_per_time,
     predict_arima = predict_arima, mse_arima_mean = pred_se
   )
+```
 
+```{r}
 compare_plot <- aggregate_all_models %>%
+  mutate(time_date = as.Date(time_date)) %>%
   ggplot() +
   geom_line(aes(x=time_date, y=actual_sum, color="Actual"), size=1) +
   geom_line(aes(x=time_date, y=predict_stsvr, color="STSVR"), size=1, linetype = "dashed") +
@@ -225,13 +205,13 @@ compare_plot <- aggregate_all_models %>%
   geom_line(aes(x=time_date, y=predict_starima, color="STARIMA"), size=1, linetype = "dashed") +
   geom_line(aes(x=time_date, y=predict_arima, color="ARIMA"), size=1, linetype = "dashed") +
   geom_line(aes(x=time_date, y=predict_stgcn, color="STGCN"), size=1, linetype = "dashed") +
-  geom_line(aes(x=time_date, y=predict_sgcn, color="TGCN"), size=1, linetype = "dashed") +
+  geom_line(aes(x=time_date, y=predict_ann, color="ANN"), size=1, linetype = "dashed") +
   scale_color_manual(name = "Type",
                      values = c("Actual" = "#1e23b3", 
                                 "STSVR" = "#63e0ff", "TSVR" = "#25b7db",
                                 "STARIMA" = "#2fad6e", "ARIMA" = "#1a633f",
-                                "TGCN" = "#d465d6", "STGCN" = "#9b819c")) +
-  labs(title="ST-SVR vs STARIMA Prediction", y="Accidents") +
+                                "ANN" = "#d465d6", "STGCN" = "#9b819c")) +
+  labs(title="Model Prediction", y="Accidents") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
@@ -245,14 +225,13 @@ avg_mse_tsvr <- round(mean(aggregate_all_models$mse_tsvr_mean, na.rm = TRUE) * 1
 avg_mse_starima <- round(mean(aggregate_all_models$mse_starima_mean, na.rm = TRUE) * 100, 10)
 avg_mse_arima <- round(mean(aggregate_all_models$mse_arima_mean, na.rm = TRUE) * 100, 10)
 avg_mse_stgcn <- round(mean(aggregate_all_models$mse_stgcn_mean, na.rm = TRUE) * 100, 510)
-avg_mse_sgcn <- round(mean(aggregate_all_models$mse_sgcn_mean, na.rm = TRUE) * 100, 10)
+avg_mse_ann <- round(mean(aggregate_all_models$mse_ann_mean, na.rm = TRUE) * 100, 10)
 
 # create table for MSE
 tb <- tibble(
-  Model = c("STSVR", "TSVR", "STARIMA", "ARIMA", "STGCN", "TGCN"),
-  MSE = c(avg_mse_svr, avg_mse_tsvr, avg_mse_starima, avg_mse_arima, avg_mse_stgcn, avg_mse_sgcn),
+  Model = c("STSVR", "TSVR", "STARIMA", "ARIMA", "ANN", "TGCN"),
+  MSE = c(avg_mse_svr, avg_mse_tsvr, avg_mse_starima, avg_mse_arima, avg_mse_stgcn, avg_mse_ann),
 )
 tb
-
 
 ```

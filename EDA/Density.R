@@ -1,5 +1,6 @@
 # https://bookdown.org/nicohahn/making_maps_with_r5/docs/ggplot2.html#using-ggplot2-to-create-maps
 library(scico)
+library(tidyverse)
 
 ggplot() +
   geom_sf(

@@ -7,8 +7,13 @@ source('utils/starima_package.R')
 # week + LAD
 # month + MSOA
 time_scale <- "month"
-rt <- read_final_data('MSOA', time_scale)
+# rt <- read_final_data('MSOA', time_scale)
+# saveRDS(rt, file = "./Data/spatial_data.rds")
+rt <- readRDS("./Data/spatial_data.rds")
+
 final_data <- rt[[2]]
+final_data <- final_data %>%
+  filter(time_date >= as.Date("2010-01-01"))
 
 cscale <- 'msoa21cd'
 if (cscale == 'lad22cd') {
@@ -63,8 +68,12 @@ ready_data <- panel_data_spatial %>%
     # this is the spatial lag at time t-1
     spatial_lag_1 = lag(spatial_lag_t, 1) 
   ) %>%
-  ungroup() %>%
-  filter(!is.na(t_minus_1) & !is.na(t_minus_7) & !is.na(spatial_lag_1))
+  ungroup()%>%
+  mutate(
+    t_minus_1 = replace_na(t_minus_1, 0),
+    t_minus_7 = replace_na(t_minus_7, 0),
+    spatial_lag_1 = replace_na(spatial_lag_1, 0)
+  )
 
 normalise_f <- function(x) {
   (x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
@@ -75,6 +84,24 @@ ready_data <- ready_data %>%
     t_minus_1 = normalise_f(t_minus_1),
     t_minus_7 = normalise_f(t_minus_7),
     spatial_lag_1 = normalise_f(spatial_lag_1))
+
+X_sorted <- ready_data %>% arrange(time_date, .data[[cscale]])
+unique_dates <- unique(X_sorted$time_date)
+
+split_index <- floor(0.8 * length(unique_dates))
+split_date <- unique_dates[split_index]
+
+train <- X_sorted %>% filter(time_date <= split_date)
+test <- X_sorted %>% filter(time_date > split_date)
+
+train_X <- as.matrix(train %>% select(t_minus_1, t_minus_7, spatial_lag_1))
+test_X <- as.matrix(test %>% select(t_minus_1, t_minus_7, spatial_lag_1))
+
+train_X_t <- as.matrix(train %>% select(t_minus_1, t_minus_7))
+test_X_t <- as.matrix(test %>% select(t_minus_1, t_minus_7))
+
+train_y <- train$accident_count
+test_y <- test$accident_count
 
 source('Model/STSVR.R')
 source('Model/STARIMA.R')
