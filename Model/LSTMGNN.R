@@ -59,7 +59,38 @@ with_no_grad({
 })
 
 
-test_results_stgcn <- test %>%
+test_results_final <- test %>%
   mutate(
-    Predicted_gcn_lstm = pred_gcn_lstm
+    Predicted_ann = pred_ann,
+    Predicted_stgcn = pred_stgcn,
+    Predicted_gcn_lstm = pred_gcn_lstm,
+    Actual = accident_count
+  )%>%
+  mutate(
+    mse_ann = (Predicted_ann - Actual)^2,
+    mse_stgcn = (Predicted_stgcn - Actual)^2,
+    mse_gcn_lstm = (Predicted_gcn_lstm - Actual)^2
   )
+
+test_results_final%>%
+  summarise(
+    mse_ann = mean(mse_ann),
+    mse_stgcn = mean(mse_stgcn),
+    mse_gcn_lstm = mean(mse_gcn_lstm)
+  )
+
+test_results_final%>%
+  group_by(time_date)%>%
+  summarise(
+    mean_pred_ann = mean(Predicted_ann),
+    mean_pred_stgcn = mean(Predicted_stgcn),
+    mean_pred_gcn_lstm = mean(Predicted_gcn_lstm),
+    mean_actual = mean(Actual)
+  )%>%
+  ggplot()+
+  geom_line(aes(x=time_date, y=mean_pred_ann, color="STGCN"), linetype = "dashed")+
+  geom_line(aes(x=time_date, y=mean_pred_stgcn, color="GCN-LSTM"), linetype = "dashed")+
+  geom_line(aes(x=time_date, y=mean_pred_gcn_lstm, color="ANN"), linetype = "dashed")+
+  geom_line(aes(x=time_date, y=mean_actual, color="Actual"))
+
+

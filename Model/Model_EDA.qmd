@@ -159,7 +159,7 @@ predicted_line <- test_results_stgcn%>%
 predicted_line
 ```
 
-# Compare Three models
+# Compare All models
 
 ```{r}
 stsvr_metrics <- analyse_final_all %>%
