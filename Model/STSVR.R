@@ -26,17 +26,19 @@ results <- mclapply(
   function(data) {
     train_ksvm(data$x, data$y, data$test)
   },
-  mc.cores = 6
+  mc.cores = 8
 )
 
 predictions_st <- results[[1]]
 predictions_t <- results[[2]]
 
-test_results <- test %>%
+test_results_svr <- test %>%
   mutate(
-    Predicted = predictions_st,
-    Predicted_t = predictions_t,
-    Actual = accident_count)
+    Predicted_stsvr = predictions_st,
+    Predicted_tsvr = predictions_t,
+    mse_stsvr = (accident_count - predictions_st)^2,
+    mse_tsvr = (accident_count - predictions_t)^2
+    )
 
-test_results%>%write.csv("./Data/CalculatedData/test_results_stsvr.csv")
-test_results <- read.csv("./Data/CalculatedData/test_results_stsvr.csv")
+test_results_svr%>%write.csv("./Data/CalculatedData/test_results_stsvr.csv")
+test_results_svr <- read.csv("./Data/CalculatedData/test_results_stsvr.csv")

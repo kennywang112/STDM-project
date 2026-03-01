@@ -106,4 +106,42 @@ test_y <- test$accident_count
 source('Model/STSVR.R')
 source('Model/STARIMA.R')
 source('Model/STGCN.R')
+source('Model/LSTMGNN.R')
+
+
+test_results_all <- test %>%
+  mutate(time_date = as.character(time_date)) %>%
+  left_join(
+    test_results_svr %>%
+      mutate(time_date = as.character(time_date)) %>%
+      select(time_date, msoa21cd, Predicted_stsvr, Predicted_tsvr, mse_stsvr, mse_tsvr),
+    by = c("time_date", "msoa21cd")
+  ) %>%
+  left_join(
+    test_results_starima %>%
+      mutate(time_date = as.character(time_date)) %>%
+      select(time_date, msoa21cd, Predicted_starima, Predicted_arima, mse_starima, mse_arima),
+    by = c("time_date", "msoa21cd")
+  ) %>%
+  left_join(
+    test_results_stgcn %>%
+      mutate(time_date = as.character(time_date)) %>%
+      select(time_date, msoa21cd, Predicted_ann, Predicted_stgcn, mse_ann, mse_stgcn),
+    by = c("time_date", "msoa21cd")
+  ) %>%
+  left_join(
+    test_results_gcnlstm %>%
+      mutate(time_date = as.character(time_date)) %>%
+      select(time_date, msoa21cd, Predicted_gcn_lstm, mse_gcn_lstm),
+    by = c("time_date", "msoa21cd")
+  ) %>%
+  mutate(time_date = as.Date(time_date))%>%
+  filter(!is.na(Predicted_starima))%>% # add geometry
+  left_join(
+    london_msoa_geom %>% select(msoa21cd, geometry),
+    by = "msoa21cd"
+  )
+ 
+test_results_all %>% write.csv("./Data/CalculatedData/test_results_ALL_MODELS.csv", row.names = FALSE)
+
 

@@ -62,12 +62,52 @@ pred_se <- rowMeans((actual_mat_aligned - pred_arima_mat)^2, na.rm = TRUE)
 diff_arima_mat <- actual_mat_aligned - pred_arima_mat
 arima_mse_vec <- colMeans(diff_arima_mat^2, na.rm = TRUE)
 
-starima_metrics <- data.frame(
-  #lad22cd = names(star_mse_vec),
-  msoa21cd = names(star_mse_vec),
-  mse_star = star_mse_vec,
-  mse_arima = arima_mse_vec
-)
+# starima_metrics <- data.frame(
+#   #lad22cd = names(star_mse_vec),
+#   msoa21cd = names(star_mse_vec),
+#   mse_star = star_mse_vec,
+#   mse_arima = arima_mse_vec
+# )
 
 # starima_metrics%>%write.csv("./Data/CalculatedData/test_results_starima.csv")
 # starima_metrics <- read.csv("./Data/CalculatedData/test_results_starima.csv")
+
+all_dates <- ready_data %>% arrange(time_date) %>% pull(time_date) %>% unique()
+
+test_dates_starima <- tail(all_dates, n_rows)
+test_dates_arima <- tail(all_dates, n_rows_arima)
+
+region_ids <- colnames(test_Z)
+
+pred_starima_df <- as.data.frame(tail(pred_mat, n_rows))
+colnames(pred_starima_df) <- region_ids
+pred_starima_df$time_date <- test_dates_starima
+
+pred_starima_long <- pred_starima_df %>%
+  pivot_longer(
+    cols = -time_date,
+    names_to = "msoa21cd",
+    values_to = "Predicted_starima"
+  )
+
+pred_arima_df <- as.data.frame(pred_arima_mat)
+colnames(pred_arima_df) <- region_ids
+pred_arima_df$time_date <- test_dates_arima
+
+pred_arima_long <- pred_arima_df %>%
+  pivot_longer(
+    cols = -time_date,
+    names_to = "msoa21cd",
+    values_to = "Predicted_arima"
+  )
+
+test_results_starima <- test %>%
+  left_join(pred_starima_long, by = c("time_date", "msoa21cd")) %>%
+  left_join(pred_arima_long, by = c("time_date", "msoa21cd")) %>%
+  mutate(
+    mse_starima = (accident_count - Predicted_starima)^2,
+    mse_arima = (accident_count - Predicted_arima)^2
+  )
+
+test_results_starima %>% write.csv("./Data/CalculatedData/test_results_starima.csv", row.names = FALSE)
+test_results_starima <- read.csv("./Data/CalculatedData/test_results_starima.csv")

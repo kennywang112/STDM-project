@@ -1,4 +1,5 @@
 source('utils/gcn_model.R')
+source('utils/gcn_lstm.R') # new version of train_model_val is here
 
 N_nodes <- length(W_list$neighbours)
 A_dense <- torch_tensor(listw2mat(W_list), dtype = torch_float32())$to(device = device)
@@ -49,7 +50,7 @@ y_test_t_tensor_3d <- torch_tensor(test_data$accident_count, dtype = torch_float
 criterion <- nn_mse_loss()
 num_epochs <- 100
 min_delta <- 0.0001
-patience <- 5
+patience <- 10
 
 model_ann <- ann_net(n_feat = 3, n_hid = 16, n_out = 1) 
 
@@ -60,7 +61,7 @@ hist_ann <- train_model_val(
   val_x = x_val_tensor, val_y = y_val_tensor,
   test_x = x_test_tensor, test_y = y_test_tensor,
   save_path = "./Data/CalculatedData/best_model_ann.pt",
-  A_mat = NULL, num_epochs = num_epochs, patience = patience
+  A_mat = NULL, num_epochs = num_epochs, patience = patience, min_delta = min_delta
 )
 
 model_ann$load_state_dict(torch_load("./Data/CalculatedData/best_model_ann.pt"))
@@ -75,11 +76,11 @@ model_stgcn <- gcn_net(n_feat = 2, n_hid = 16, n_out = 1)
 cat('STGCN')
 hist_stgcn <- train_model_val(
   model_obj = model_stgcn, 
-  train_x = x_t_tensor_3d,      train_y = y_t_tensor_3d,
-  val_x   = x_t_val_tensor_3d,  val_y   = y_t_val_tensor_3d,
-  test_x  = x_test_t_tensor_3d, test_y  = y_test_t_tensor_3d,
+  train_x = x_t_tensor_3d, train_y = y_t_tensor_3d,
+  val_x = x_t_val_tensor_3d,  val_y = y_t_val_tensor_3d,
+  test_x = x_test_t_tensor_3d, test_y = y_test_t_tensor_3d,
   save_path = "./Data/CalculatedData/best_model_stgcn.pt",
-  A_mat = A_dense, num_epochs = num_epochs, patience = patience
+  A_mat = A_dense, num_epochs = num_epochs, patience = patience, min_delta = min_delta
 )
 
 model_stgcn$load_state_dict(torch_load("./Data/CalculatedData/best_model_stgcn.pt"))
@@ -94,7 +95,8 @@ test_results_stgcn <- test %>%
   mutate(
     Predicted_ann = pred_ann,
     Predicted_stgcn = pred_stgcn,
-    Actual = accident_count
+    mse_ann = (accident_count - pred_ann)^2,
+    mse_stgcn = (accident_count - pred_stgcn)^2
   )
 
 test_results_stgcn %>% write.csv("./Data/CalculatedData/test_results_stgcn.csv", row.names = FALSE)

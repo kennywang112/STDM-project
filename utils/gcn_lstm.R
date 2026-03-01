@@ -1,3 +1,6 @@
+library(torch)
+device <- torch_device("mps")
+
 create_stgcn_data <- function(
   long_data, cscale_col, time_col, value_col, window_size = 7
 ) {
@@ -88,7 +91,7 @@ train_model_val <- function(
     test_x, test_y, 
     save_path,
     A_mat = NULL,
-    num_epochs = 100, min_delta = 0.0001, patience = 5,
+    num_epochs = 100, min_delta = 0.0001, patience = 5, lr = 0.001,
     target_device = device
 ) {
   model_obj$to(device = target_device)
@@ -101,7 +104,7 @@ train_model_val <- function(
   
   if (!is.null(A_mat)) A_mat <- A_mat$to(device = target_device)
 
-  optimizer <- optim_adam(model_obj$parameters, lr = 0.001)
+  optimizer <- optim_adam(model_obj$parameters, lr = lr)
   criterion <- nn_mse_loss()
   
   best_val_loss <- Inf
