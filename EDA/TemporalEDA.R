@@ -22,7 +22,7 @@ if (cscale == 'lad22cd') {
 
 daily_acc <- final_data%>%
   st_drop_geometry() %>%
-  filter(time_date >= as.Date("2010-01-01"))%>%
+  filter(time_date >= as.Date("2000-01-01"))%>%
   group_by(time_date)%>%
   summarise(accident_count = sum(accident_count))
   
@@ -32,6 +32,22 @@ daily_acc%>%
   geom_point(size = 2) +
   scale_x_date(date_labels = "%Y-%m", date_breaks = "1 month")
 
+monthy_acc <- daily_acc%>%
+  # group by month
+  group_by(month = floor_date(time_date, "month"))%>%
+  summarise(monthly_accidents = sum(accident_count))%>%
+  ggplot(aes(x=month, y=monthly_accidents)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  scale_x_date(date_labels = "%Y", date_breaks = "1 year") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  # draw curve
+  geom_smooth(method = "loess", se = FALSE, color = "red", linewidth = 1) +
+  theme_bw() +
+  ggtitle("Monthly Accident Counts with LOESS Smoothing") +
+  xlab("Month") +
+  ylab("Total Accidents")
+ggsave("Data/Layout/monthly_acc.png", monthy_acc, width = 10, height = 5)
 
 # same as above
 library(forecast)

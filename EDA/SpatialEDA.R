@@ -3,6 +3,13 @@ library(spdep)
 source('utils/read_data.R')
 source('utils/map_func.R')
 
+rt <- readRDS("./Data/spatial_data.rds")
+final_data <- rt[[2]]
+
+accident <- st_read("./Data/accident_2000.gpkg")
+accidents_joined <- st_join(accident, london_lsoa_4326, left = FALSE)%>%
+  st_transform(27700)
+
 cscale <- 'msoa21cd'
 if (cscale == 'lad22cd') {
   londona_geom <- london_lad_geom
@@ -25,15 +32,16 @@ london_stats <- londona_geom %>%
   left_join(msoa_counts, by = cscale) %>%
   mutate(accident_count = replace_na(accident_count, 0))%>%
   left_join(pop, by=cscale)%>%
-  mutate(accidents_per_1000 = (accident_count / population) * 1000)
+  mutate(accidents_per_1000 = (accident_count / population) * 100)
 
-tmap_mode("plot")
 tmap_mode("view")
 accident_count_map <- tm_shape(london_stats) +
   add_map_decorations_polygon("accident_count", "Accidents per LSOA")
 
 accident_rate <- tm_shape(london_stats) +
-  add_map_decorations_polygon("accidents_per_1000", "Accidents per 1000 People")
+  add_map_decorations_polygon("accidents_per_1000", "Accidents Rate") +
+  # title
+  tm_layout(main.title = "Accident Rate (Divided by Population)")
 
 accident_map <- tmap_arrange(accident_count_map, accident_rate, ncol = 2)
 tmap_save(accident_map, filename = paste0("Data/Layout/London_Accidents_Comparison_",cscale,".png", sep=''), width = 12, height = 6, dpi = 300)
@@ -142,7 +150,6 @@ library(gridExtra)
 final_layout <- grid.arrange(morans_scatter, tmap_grob(morans_map), ncol = 2)
 ggsave(filename = paste0("Data/Layout/Morans_map_",cscale,".png", sep=''), plot = final_layout, width = 15, height = 6, dpi = 300)
 # GI
-
 # plot the data and neighbours
 
 gi_results <- localG(london_stats$accidents_per_1000, W_list)
