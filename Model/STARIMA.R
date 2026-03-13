@@ -118,9 +118,12 @@ test_results_starima <- test %>%
   left_join(pred_arima_long, by = c("time_date_char" = "time_date", "msoa21cd_char" = "msoa21cd")) %>%
   select(-time_date_char, -msoa21cd_char) %>%
   mutate(
-    mse_starima = (accident_count - Predicted_starima)^2,
-    mse_arima = (accident_count - Predicted_arima)^2
-  )
+    real_actual = accident_count * (acc_max - acc_min) + acc_min,
+    mse_starima = (real_actual - Predicted_starima)^2,
+    mse_arima = (real_actual - Predicted_arima)^2
+  ) %>%
+  mutate(accident_count = real_actual) %>%
+  select(-real_actual)
 
 test_results_starima%>%filter(!is.na(mse_arima))
 

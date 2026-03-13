@@ -34,11 +34,14 @@ predictions_t <- results[[2]]
 
 test_results_svr <- test %>%
   mutate(
-    Predicted_stsvr = predictions_st,
-    Predicted_tsvr = predictions_t,
-    mse_stsvr = (accident_count - predictions_st)^2,
-    mse_tsvr = (accident_count - predictions_t)^2
-    )
+    real_actual = accident_count * (acc_max - acc_min) + acc_min,
+    Predicted_stsvr = predictions_st * (acc_max - acc_min) + acc_min,
+    Predicted_tsvr = predictions_t * (acc_max - acc_min) + acc_min,
+    mse_stsvr = (real_actual - Predicted_stsvr)^2,
+    mse_tsvr = (real_actual - Predicted_tsvr)^2
+  ) %>%
+  mutate(accident_count = real_actual) %>%
+  select(-real_actual)
 
 test_results_svr%>%write.csv("./Data/CalculatedData/test_results_stsvr.csv")
 test_results_svr <- read.csv("./Data/CalculatedData/test_results_stsvr.csv")

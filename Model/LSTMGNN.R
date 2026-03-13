@@ -1,10 +1,14 @@
 source('./utils/gcn_lstm.R')
 
+torch_manual_seed(123)
+
 window_len <- 7
 A_dense <- torch_tensor(listw2mat(W_list), dtype = torch_float32())$to(device = device)
 
+scaled_full_data <- bind_rows(train, test) %>% arrange(time_date, .data[[cscale]])
+
 st_data <- create_stgcn_data(
-  long_data = ready_data, 
+  long_data = scaled_full_data, 
   cscale_col = cscale, 
   time_col = "time_date", 
   value_col = "accident_count", 
@@ -38,8 +42,9 @@ test_y_tensor  <- torch_tensor(test_y_array, dtype = torch_float())
 
 cat(sprintf("Train: %d, Val: %d, Test: %d\n", dim(train_x_tensor)[1], dim(val_x_tensor)[1], dim(test_x_tensor)[1]))
 
-num_epochs <- 100
+num_epochs <- 300
 min_delta <- 0.00001
+lr = 0.00001
 patience <- 10
 
 stgcn_model <- gcnlstm_net(n_feat = 1, n_hid = 16, n_out = 1, lstm_layers = 1)
@@ -51,7 +56,7 @@ history <- train_model_val(
   test_x = test_x_tensor, test_y = test_y_tensor,
   A_mat = A_dense,
   save_path = "./Data/CalculatedData/best_gcnlstm_model.pt",
-  num_epochs = num_epochs, patience = patience, min_delta = min_delta, lr = 0.001
+  num_epochs = num_epochs, patience = patience, min_delta = min_delta, lr = lr
 )
 
 stgcn_model$load_state_dict(torch_load("./Data/CalculatedData/best_gcnlstm_model.pt"))
@@ -62,11 +67,15 @@ with_no_grad({
   pred_gcn_lstm <- as.numeric(pred_tensor$to(device = "cpu"))
 })
 
+
 test_results_gcnlstm <- test %>%
   mutate(
-    Predicted_gcn_lstm = pred_gcn_lstm,
-    mse_gcn_lstm = (Predicted_gcn_lstm - accident_count)^2
-  )
+    real_actual = accident_count * (acc_max - acc_min) + acc_min,
+    Predicted_gcn_lstm = pred_gcn_lstm * (acc_max - acc_min) + acc_min,
+    mse_gcn_lstm = (Predicted_gcn_lstm - real_actual)^2
+  ) %>%
+  mutate(accident_count = real_actual) %>%
+  select(-real_actual)
 
 test_results_gcnlstm%>%write.csv("./Data/CalculatedData/test_results_gcnlstm.csv")
 test_results_gcnlstm <- read.csv("./Data/CalculatedData/test_results_gcnlstm.csv")

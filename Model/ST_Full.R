@@ -75,16 +75,6 @@ ready_data <- panel_data_spatial %>%
     spatial_lag_1 = replace_na(spatial_lag_1, 0)
   )
 
-normalise_f <- function(x) {
-  (x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
-}
-ready_data <- ready_data %>%
-  mutate(
-    accident_count = normalise_f(accident_count),
-    t_minus_1 = normalise_f(t_minus_1),
-    t_minus_7 = normalise_f(t_minus_7),
-    spatial_lag_1 = normalise_f(spatial_lag_1))
-
 X_sorted <- ready_data %>% arrange(time_date, .data[[cscale]])
 unique_dates <- unique(X_sorted$time_date)
 
@@ -93,6 +83,29 @@ split_date <- unique_dates[split_index]
 
 train <- X_sorted %>% filter(time_date <= split_date)
 test <- X_sorted %>% filter(time_date > split_date)
+
+acc_min <- min(train$accident_count, na.rm = TRUE)
+acc_max <- max(train$accident_count, na.rm = TRUE)
+
+scale_with_train <- function(x) {
+  (x - acc_min) / (acc_max - acc_min)
+}
+
+train <- train %>%
+  mutate(
+    accident_count = scale_with_train(accident_count),
+    t_minus_1 = scale_with_train(t_minus_1),
+    t_minus_7 = scale_with_train(t_minus_7),
+    spatial_lag_1 = scale_with_train(spatial_lag_1)
+  )
+
+test <- test %>%
+  mutate(
+    accident_count = scale_with_train(accident_count),
+    t_minus_1 = scale_with_train(t_minus_1),
+    t_minus_7 = scale_with_train(t_minus_7),
+    spatial_lag_1 = scale_with_train(spatial_lag_1)
+  )
 
 train_X <- as.matrix(train %>% select(t_minus_1, t_minus_7, spatial_lag_1))
 test_X <- as.matrix(test %>% select(t_minus_1, t_minus_7, spatial_lag_1))
@@ -110,6 +123,7 @@ source('Model/LSTMGNN.R')
 
 
 test_results_all <- test %>%
+  mutate(accident_count = accident_count * (acc_max - acc_min) + acc_min) %>%
   mutate(time_date = as.character(time_date)) %>%
   left_join(
     test_results_svr %>%
@@ -142,6 +156,7 @@ test_results_all <- test %>%
     by = "msoa21cd"
   )
  
-test_results_all %>% write.csv("./Data/CalculatedData/test_results_ALL_MODELS.csv", row.names = FALSE)
+saveRDS(test_results_all, file = "./Data/CalculatedData/test_results_ALL_MODELS.rds")
+test_results_all <- readRDS("./Data/CalculatedData/test_results_ALL_MODELS.rds")
 
 

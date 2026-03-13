@@ -7,11 +7,11 @@ source('./utils/boundaries.R')
 #   filter(!is.na(longitude) & !is.na(latitude)) %>%
 #   st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
 # st_write(accident, "./Data/accident_2000.gpkg", delete_dsn = TRUE)
-# accident <- st_read("./Data/accident_2000.gpkg")
+accident <- st_read("./Data/accident_2000.gpkg")
 
 london_lsoa_4326 <- st_transform(london_lsoa, 4326)
-# accidents_joined <- st_join(accident, london_lsoa_4326, left = FALSE)%>%
-#   st_transform(27700)
+accidents_joined <- st_join(accident, london_lsoa_4326, left = FALSE)%>%
+  st_transform(27700)
 
 pop_raw <- read_excel("Data/sapelsoasyoa20222024.xlsx", sheet = "Mid-2024 LSOA 2021", skip = 3) # Population in LSOA
 
@@ -87,28 +87,28 @@ read_final_data <- function(
 
 
 
-# code_list_df <- read_xlsx('./Data/dft-road-casualty-statistics-road-safety-open-dataset-data-guide-2024.xlsx', sheet = "2024_code_list")
-# collision_codes <- code_list_df %>%
-#   # filter(tolower(table) == 'collision') %>%
-#   filter(!is.na(`code/format`) & !is.na(label))
-# 
-# 
-# mapped_df <- accident
+code_list_df <- read_xlsx('./Data/dft-road-casualty-statistics-road-safety-open-dataset-data-guide-2024.xlsx', sheet = "2024_code_list")
+collision_codes <- code_list_df %>%
+  # filter(tolower(table) == 'collision') %>%
+  filter(!is.na(`code/format`) & !is.na(label))
 
-# for (col_name in colnames(mapped_df)) {
-#   
-#   original_values <- as.character(mapped_df[[col_name]])
-#   mapping <- collision_codes %>% filter(`field name` == col_name)
-#   
-#   # namevec: c('code' = 'label')
-#   lookup_vec <- setNames(mapping$label, as.character(mapping$`code/format`))
-#   mapped_values <- lookup_vec[original_values]
-#   
-#   matched_indices <- !is.na(mapped_values)
-#   
-#   if (any(matched_indices)) {
-#     mapped_df[[col_name]] <- as.character(mapped_df[[col_name]])
-#     mapped_df[[col_name]][matched_indices] <- mapped_values[matched_indices]
-#   }
-# }
-# mapped_df
+
+mapped_df <- accident
+
+for (col_name in colnames(mapped_df)) {
+
+  original_values <- as.character(mapped_df[[col_name]])
+  mapping <- collision_codes %>% filter(`field name` == col_name)
+
+  # namevec: c('code' = 'label')
+  lookup_vec <- setNames(mapping$label, as.character(mapping$`code/format`))
+  mapped_values <- lookup_vec[original_values]
+
+  matched_indices <- !is.na(mapped_values)
+
+  if (any(matched_indices)) {
+    mapped_df[[col_name]] <- as.character(mapped_df[[col_name]])
+    mapped_df[[col_name]][matched_indices] <- mapped_values[matched_indices]
+  }
+}
+mapped_df

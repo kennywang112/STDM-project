@@ -47,7 +47,8 @@ gcn_layer_for_lstm <- nn_module(
     # [1, Nodes, Nodes] @ [batch, Nodes, 1] -> [batch, Nodes, 1]
     output <- torch_matmul(adj$unsqueeze(1), support)
     
-    return(output + self$bias)
+    out <- output + self$bias
+    return(out)
   }
 )
 
@@ -91,12 +92,15 @@ train_model_val <- function(
     test_x, test_y, 
     save_path,
     A_mat = NULL,
-    num_epochs = 100, min_delta = 0.0001, patience = 5, lr = 0.001,
-    target_device = device
+    num_epochs = 100, min_delta = 0.0001, patience = 5, lr = 0.00001,
+    target_device = device,
+    batch_size = 128
 ) {
   model_obj$to(device = target_device)
-  train_x <- train_x$to(device = target_device)
-  train_y <- train_y$to(device = target_device)
+  
+  train_ds <- tensor_dataset(train_x, train_y)
+  train_dl <- dataloader(train_ds, batch_size = batch_size, shuffle = TRUE)
+
   val_x <- val_x$to(device = target_device)
   val_y <- val_y$to(device = target_device)
   test_x <- test_x$to(device = target_device)
@@ -114,19 +118,32 @@ train_model_val <- function(
   
   for (epoch in 1:num_epochs) {
     model_obj$train()
-    optimizer$zero_grad()
     
-    if (!is.null(A_mat)) {
-      output <- model_obj(train_x, A_mat)
-    } else {
-      output <- model_obj(train_x)
-    }
+    epoch_loss <- 0
+    num_batches <- 0
     
-    loss <- criterion(output, train_y)
-    loss$backward()
-    optimizer$step()
-    train_hist[epoch] <- loss$item()
-  
+    coro::loop(for (batch in train_dl) {
+      optimizer$zero_grad()
+      
+      b_x <- batch[[1]]$to(device = target_device)
+      b_y <- batch[[2]]$to(device = target_device)
+      
+      if (!is.null(A_mat)) {
+        output <- model_obj(b_x, A_mat)
+      } else {
+        output <- model_obj(b_x)
+      }
+      
+      loss <- criterion(output, b_y)
+      loss$backward()
+      optimizer$step()
+      
+      epoch_loss <- epoch_loss + loss$item()
+      num_batches <- num_batches + 1
+    })
+    
+    train_hist[epoch] <- epoch_loss / num_batches
+    
     model_obj$eval()
     with_no_grad({
       if (!is.null(A_mat)) {
@@ -137,7 +154,7 @@ train_model_val <- function(
       val_loss <- criterion(val_output, val_y)
       val_hist[epoch] <- val_loss$item()
     })
-
+    
     if (val_loss$item() < (best_val_loss - min_delta)) {
       best_val_loss <- val_loss$item()
       early_stop_counter <- 0
@@ -150,9 +167,9 @@ train_model_val <- function(
       cat(sprintf("-> Early stopping in Epoch %d. Val Loss: %.5f\n", epoch, best_val_loss))
       break
     }
-  
-    if (epoch %% 10 == 0 || epoch == 1) {
-      cat(sprintf("Epoch %3d | Train Loss: %.5f | Val Loss: %.5f\n", epoch, loss$item(), val_loss$item()))
+    
+    if (epoch %% 5 == 0 || epoch == 1) {
+      cat(sprintf("Epoch %3d | Train Loss: %.5f | Val Loss: %.5f\n", epoch, train_hist[epoch], val_hist[epoch]))
     }
   }
 
@@ -166,7 +183,7 @@ train_model_val <- function(
     }
     final_test_loss <- criterion(test_output, test_y)
   })
-  
+
   cat(sprintf("\n=== Finish Training ===\n Test Loss: %.5f\n", final_test_loss$item()))
 
   return(list(

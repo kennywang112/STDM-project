@@ -1,23 +1,18 @@
 source('utils/gcn_model.R')
 source('utils/gcn_lstm.R') # new version of train_model_val is here
 
+torch_manual_seed(123)
+
 N_nodes <- length(W_list$neighbours)
 A_dense <- torch_tensor(listw2mat(W_list), dtype = torch_float32())$to(device = device)
 
-ready_data <- ready_data %>% arrange(time_date, .data[[cscale]])
+unique_train_dates <- sort(unique(train$time_date))
+train_split_index <- floor(0.8 * length(unique_train_dates))
+train_split_date <- unique_train_dates[train_split_index]
 
-unique_dates <- sort(unique(ready_data$time_date))
-total_time_steps <- length(unique_dates)
-
-split_index <- floor(0.8 * total_time_steps)
-split_date <- unique_dates[split_index]
-
-train_index <- floor(0.8 * split_index)
-train_date <- unique_dates[train_index]
-
-train_data <- ready_data %>% filter(time_date <= train_date)
-val_data <- ready_data %>% filter(time_date > train_date & time_date <= split_date)
-test_data <- ready_data %>% filter(time_date > split_date)
+train_data <- train %>% filter(time_date <= train_split_date)
+val_data <- train %>% filter(time_date > train_split_date)
+test_data <- test
 
 x_ann_train <- as.matrix(train_data %>% select(t_minus_1, t_minus_7, spatial_lag_1))
 x_ann_val <- as.matrix(val_data %>% select(t_minus_1, t_minus_7, spatial_lag_1))
@@ -49,7 +44,8 @@ y_test_t_tensor_3d <- torch_tensor(test_data$accident_count, dtype = torch_float
 
 criterion <- nn_mse_loss()
 num_epochs <- 100
-min_delta <- 0.0001
+min_delta <- 0.00001
+lr = 0.00001
 patience <- 10
 
 model_ann <- ann_net(n_feat = 3, n_hid = 16, n_out = 1) 
@@ -61,7 +57,7 @@ hist_ann <- train_model_val(
   val_x = x_val_tensor, val_y = y_val_tensor,
   test_x = x_test_tensor, test_y = y_test_tensor,
   save_path = "./Data/CalculatedData/best_model_ann.pt",
-  A_mat = NULL, num_epochs = num_epochs, patience = patience, min_delta = min_delta
+  A_mat = NULL, num_epochs = num_epochs, patience = patience, min_delta = min_delta, lr = lr
 )
 
 model_ann$load_state_dict(torch_load("./Data/CalculatedData/best_model_ann.pt"))
@@ -80,7 +76,7 @@ hist_stgcn <- train_model_val(
   val_x = x_t_val_tensor_3d,  val_y = y_t_val_tensor_3d,
   test_x = x_test_t_tensor_3d, test_y = y_test_t_tensor_3d,
   save_path = "./Data/CalculatedData/best_model_stgcn.pt",
-  A_mat = A_dense, num_epochs = num_epochs, patience = patience, min_delta = min_delta
+  A_mat = A_dense, num_epochs = num_epochs, patience = patience, min_delta = min_delta, lr = lr
 )
 
 model_stgcn$load_state_dict(torch_load("./Data/CalculatedData/best_model_stgcn.pt"))
@@ -90,14 +86,16 @@ with_no_grad({
   pred_stgcn <- as.numeric(model_stgcn(x_test_t_tensor_3d$to(device = device), A_dense)$to(device = "cpu"))
 })
 
-
 test_results_stgcn <- test %>%
   mutate(
-    Predicted_ann = pred_ann,
-    Predicted_stgcn = pred_stgcn,
-    mse_ann = (accident_count - pred_ann)^2,
-    mse_stgcn = (accident_count - pred_stgcn)^2
-  )
+    real_actual = accident_count * (acc_max - acc_min) + acc_min,
+    Predicted_ann = pred_ann * (acc_max - acc_min) + acc_min,
+    Predicted_stgcn = pred_stgcn * (acc_max - acc_min) + acc_min,
+    mse_ann = (real_actual - Predicted_ann)^2,
+    mse_stgcn = (real_actual - Predicted_stgcn)^2
+  ) %>%
+  mutate(accident_count = real_actual) %>%
+  select(-real_actual)
 
 test_results_stgcn %>% write.csv("./Data/CalculatedData/test_results_stgcn.csv", row.names = FALSE)
 test_results_stgcn <- read.csv("./Data/CalculatedData/test_results_stgcn.csv")
