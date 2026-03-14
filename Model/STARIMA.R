@@ -1,17 +1,19 @@
 library(forecast)
+source('utils/starima_package.R')
 
-Z_matrix <- ready_data %>%
+Z_matrix_df <- ready_data %>%
   select(time_date, !!sym(cscale), accident_count) %>%
   pivot_wider(names_from = !!sym(cscale), values_from = accident_count, values_fill = 0) %>%
-  arrange(time_date) %>%
-  select(-time_date) %>%
-  as.matrix()
+  arrange(time_date)
 
-n_time <- nrow(Z_matrix)
-split_idx <- floor(0.8 * n_time)
+time_dates <- Z_matrix_df$time_date
+Z_matrix <- as.matrix(Z_matrix_df %>% select(-time_date))
 
-train_Z <- Z_matrix[1:split_idx, ]
-test_Z <- Z_matrix[(split_idx + 1):n_time, ]
+train_idx <- which(time_dates < test_start_date)
+test_idx <- which(time_dates >= test_start_date)
+
+train_Z <- Z_matrix[train_idx, ]
+test_Z <- Z_matrix[test_idx, ]
 
 W_mat <- list(listw2mat(W_list))
 
@@ -19,14 +21,18 @@ train_total_series <- rowSums(train_Z)
 test_total_series  <- rowSums(test_Z)
 n_ahead <- length(test_total_series)
 
-train_ts <- ts(train_total_series, frequency = 7)
-fit_total <- auto.arima(train_ts, stepwise = FALSE, approximation = FALSE)
+train_ts <- ts(train_total_series, frequency = 12)
+fit_total <- auto.arima(train_ts, stepwise = TRUE, approximation = TRUE)
 print(summary(fit_total))
 
 best_orders <- arimaorder(fit_total)
 best_p <- unname(best_orders["p"])
 best_d <- unname(best_orders["d"])
 best_q <- unname(best_orders["q"])
+best_P <- unname(best_orders["P"])
+best_D <- unname(best_orders["D"])
+best_Q <- unname(best_orders["Q"])
+best_S <- unname(best_orders["m"])
 
 ############################# STARIMA
 fit.star <- starima_fit(Z = train_Z, W = W_mat, p = best_p, d = best_d, q = best_q)
@@ -43,9 +49,11 @@ colnames(pred_arima_mat_full) <- colnames(train_Z)
 
 for (i in 1:N_nodes) {
   region_train <- train_Z[, i]
-  region_ts <- ts(region_train, frequency = 7)
+  region_ts <- ts(region_train, frequency = 12)
   tryCatch({
-    fit_region <- Arima(region_ts, order = c(best_p, best_d, best_q))
+    fit_region <- Arima(region_ts, order = c(best_p, best_d, best_q),
+                        seasonal = list(order = c(best_P, best_D, best_Q), period = 12)
+                        )
     pre_region <- forecast(fit_region, h = n_ahead)
     pred_arima_mat_full[, i] <- as.numeric(pre_region$mean)
   }, error = function(e) {
@@ -129,3 +137,4 @@ test_results_starima%>%filter(!is.na(mse_arima))
 
 test_results_starima %>% write.csv("./Data/CalculatedData/test_results_starima.csv", row.names = FALSE)
 test_results_starima <- read.csv("./Data/CalculatedData/test_results_starima.csv")
+

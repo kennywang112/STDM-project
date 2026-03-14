@@ -62,3 +62,19 @@ p_pacf <- ggPacf(daily_acc$accident_count, lag.max = 30) +
 
 acf_pacf <- grid.arrange(p_acf, p_pacf, ncol = 2)
 ggsave("Data/Layout/ACF_PACF_ggplot.png", acf_pacf, width = 10, height = 5)
+
+# accumulate by month
+monthly_data <- daily_acc%>%
+  group_by(month = floor_date(time_date, "month"))%>%
+  summarise(monthly_accidents = sum(accident_count))
+
+p_acf_monthly <- ggAcf(monthly_data$monthly_accidents, lag.max = 30) + 
+  ggtitle("Monthly Accident Counts ACF") +
+  theme_bw()
+
+p_pacf_monthly <- ggPacf(monthly_data$monthly_accidents, lag.max = 30) + 
+  ggtitle("Accident Counts PACF") + 
+  theme_bw()
+
+acf_pacf_monthly <- grid.arrange(p_acf_monthly, p_pacf_monthly, ncol = 2)
+ggsave("Data/Layout/ACF_PACF_ggplot_monthly.png", acf_pacf_monthly, width = 10, height = 5)

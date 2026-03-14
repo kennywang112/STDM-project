@@ -2,34 +2,62 @@ library(torch)
 device <- torch_device("mps")
 
 create_stgcn_data <- function(
-  long_data, cscale_col, time_col, value_col, window_size = 7
+    long_data, cscale_col, time_col, value_col, feat_cols, window_size = 12
 ) {
-  # Row: time, Col: MSOA
-  wide_data <- long_data %>%
+  # 1. Initialize metadata and ensure spatial consistency
+  time_labels <- sort(unique(long_data[[time_col]]))
+  # CRITICAL: Use ordered_ids to ensure node sequence matches W_list
+  node_labels <- ordered_ids 
+  N_nodes <- length(node_labels)
+  T_total <- length(time_labels)
+  num_feats <- length(feat_cols)
+  
+  # 2. Extract Features into a 3D Array [Time x Nodes x Features]
+  # We use pivot_wider for each feature to ensure correct spatial alignment
+  feat_3d <- array(0, dim = c(T_total, N_nodes, num_feats))
+  
+  for (f in 1:num_feats) {
+    feat_name <- feat_cols[f]
+    wide_feat <- long_data %>%
+      select(all_of(c(time_col, cscale_col, feat_name))) %>%
+      pivot_wider(names_from = all_of(cscale_col), values_from = all_of(feat_name)) %>%
+      arrange(!!sym(time_col)) %>%
+      # Force columns to follow the exact order of the adjacency matrix
+      select(all_of(node_labels)) 
+    
+    feat_3d[,,f] <- as.matrix(wide_feat)
+  }
+  
+  # 3. Extract Target variable (Y) into a Matrix [Time x Nodes]
+  Y_mat <- long_data %>%
     select(all_of(c(time_col, cscale_col, value_col))) %>%
-    pivot_wider(names_from = all_of(cscale_col), values_from = all_of(value_col), values_fill = 0) %>%
-    arrange(!!sym(time_col))
+    pivot_wider(names_from = all_of(cscale_col), values_from = all_of(value_col)) %>%
+    arrange(!!sym(time_col)) %>%
+    select(all_of(node_labels)) %>%
+    as.matrix()
   
-  time_labels <- wide_data[[time_col]]
-  Y_mat <- as.matrix(wide_data %>% select(-all_of(time_col)))
-  
-  N_nodes <- ncol(Y_mat)
-  T_total <- nrow(Y_mat)
   S_samples <- T_total - window_size
   
-  # [Samples, Nodes, Window_Size, Features = 1 (only accident)]
-
-  X_array <- array(0, dim = c(S_samples, N_nodes, window_size, 1))
-  
-  # [Samples, Nodes, 1]
+  # 4. Initialize Output Tensors
+  # X: [Samples, Nodes, Window, Features] - Standard GCN-LSTM input format
+  X_array <- array(0, dim = c(S_samples, N_nodes, window_size, num_feats))
+  # Y: [Samples, Nodes, 1] - Predicting next time step for all nodes
   Y_array <- array(0, dim = c(S_samples, N_nodes, 1))
   
+  # 5. Sliding Window Generation
   for (i in 1:S_samples) {
-    window <- Y_mat[i:(i + window_size - 1), ]
-    X_array[i, , , 1] <- t(window)
+    # Extract window slice: [Window_size x Nodes x Features]
+    window_data <- feat_3d[i:(i + window_size - 1), , ]
+    
+    # Use aperm to transpose dimensions to [Nodes x Window x Features]
+    # This aligns with the 'n_feat' and 'window_len' logic in gcnlstm_net
+    X_array[i, , , ] <- aperm(window_data, c(2, 1, 3))
+    
+    # Set the target as the observation immediately following the window
     Y_array[i, , 1] <- Y_mat[i + window_size, ]
   }
   
+  # Return target time labels for evaluation mapping
   target_times <- time_labels[(window_size + 1):T_total]
   
   return(list(X = X_array, Y = Y_array, times = target_times, N = N_nodes))
@@ -77,9 +105,11 @@ gcnlstm_net <- nn_module(
     lstm_out <- self$lstm(x_lstm)
     # Transform back to [Batch, Nodes, n_hid]
     lstm_last_step <- lstm_out[[1]][, -1, ]
-    gcn_input <- lstm_last_step$view(c(B, N, -1))
+    lstm_last_step <- nnf_dropout(lstm_last_step, p = 0.3, training = self$training)
 
+    gcn_input <- lstm_last_step$view(c(B, N, -1))
     out <- self$gcn(gcn_input, adj)
+    out <- torch_sigmoid(out)
     
     return(out)
   }
@@ -109,6 +139,8 @@ train_model_val <- function(
   if (!is.null(A_mat)) A_mat <- A_mat$to(device = target_device)
 
   optimizer <- optim_adam(model_obj$parameters, lr = lr)
+  
+  scheduler <- lr_step(optimizer, step_size = 30, gamma = 0.9)
   criterion <- nn_mse_loss()
   
   best_val_loss <- Inf
@@ -143,6 +175,8 @@ train_model_val <- function(
     })
     
     train_hist[epoch] <- epoch_loss / num_batches
+    
+    scheduler$step()
     
     model_obj$eval()
     with_no_grad({

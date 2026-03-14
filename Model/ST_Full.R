@@ -1,7 +1,6 @@
 library(spdep)
 library(lubridate)
 source('utils/read_data.R')
-source('utils/starima_package.R')
 
 # to not make the data too much
 # week + LAD
@@ -38,12 +37,21 @@ all_dates <- seq(min_date, max_date, by = time_scale)
 
 grid_list <- setNames(list(ordered_ids), cscale)
 panel_data <- expand.grid(c(grid_list, list(time_date = all_dates))) %>%
-  left_join(st_drop_geometry(final_data), by = c(cscale, "time_date")) %>%
-  mutate(accident_count = replace_na(accident_count, 0)) %>%
-  arrange(time_date, match(.data[[cscale]], ordered_ids))
+  left_join(st_drop_geometry(final_data) %>% 
+              select(all_of(cscale), time_date, population, avg_rainfall, accident_count), 
+            by = c(cscale, "time_date")) %>%
+  mutate(
+    accident_count = replace_na(accident_count, 0),
+    population = replace_na(population, median(population, na.rm = TRUE)),
+    avg_rainfall = replace_na(avg_rainfall, 0)
+  )
 
 calc_spatial_daily <- function(df_subset, w_list) {
   return(lag.listw(w_list, df_subset$count, zero.policy = TRUE))
+}
+
+min_max_scale <- function(x) {
+  (x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
 }
 # spatial_lag_t = accidents in neighbors / neighbors
 panel_data_spatial <- panel_data %>%
@@ -57,68 +65,63 @@ panel_data_spatial%>%
   summarise(ct = n())%>%
   arrange(desc(ct))
 
-# Add both temporal lag and spatial lag
 ready_data <- panel_data_spatial %>%
   arrange(.data[[cscale]], time_date) %>% 
   group_by(.data[[cscale]]) %>%
   mutate(
     t = accident_count,
     t_minus_1 = lag(accident_count, 1), 
-    t_minus_7 = lag(accident_count, 7),
-    # this is the spatial lag at time t-1
-    spatial_lag_1 = lag(spatial_lag_t, 1) 
+    t_minus_12 = lag(accident_count, 12),
+    spatial_lag_1 = lag(spatial_lag_t, 1),
+    rain_lag_1 = lag(avg_rainfall, 1),
+    pop_lag_1 = lag(population, 1)
   ) %>%
-  ungroup()%>%
+  ungroup() %>%
   mutate(
-    t_minus_1 = replace_na(t_minus_1, 0),
-    t_minus_7 = replace_na(t_minus_7, 0),
-    spatial_lag_1 = replace_na(spatial_lag_1, 0)
+    across(c(t_minus_1, t_minus_12, spatial_lag_1, rain_lag_1, pop_lag_1), ~replace_na(., 0))
   )
 
-X_sorted <- ready_data %>% arrange(time_date, .data[[cscale]])
-unique_dates <- unique(X_sorted$time_date)
+test_start_date <- as.Date("2023-01-01")
+val_start_date  <- as.Date("2021-01-01")
 
-split_index <- floor(0.8 * length(unique_dates))
-split_date <- unique_dates[split_index]
+train_raw_ref <- ready_data %>% filter(time_date < test_start_date)
 
-train <- X_sorted %>% filter(time_date <= split_date)
-test <- X_sorted %>% filter(time_date > split_date)
+acc_min <- min(train_raw_ref$accident_count, na.rm = TRUE)
+acc_max <- max(train_raw_ref$accident_count, na.rm = TRUE)
+pop_min <- min(train_raw_ref$pop_lag_1, na.rm = TRUE)
+pop_max <- max(train_raw_ref$pop_lag_1, na.rm = TRUE)
+rain_min <- min(train_raw_ref$rain_lag_1, na.rm = TRUE)
+rain_max <- max(train_raw_ref$rain_lag_1, na.rm = TRUE)
 
-acc_min <- min(train$accident_count, na.rm = TRUE)
-acc_max <- max(train$accident_count, na.rm = TRUE)
-
-scale_with_train <- function(x) {
-  (x - acc_min) / (acc_max - acc_min)
-}
-
-train <- train %>%
+ready_data_scaled <- ready_data %>%
   mutate(
-    accident_count = scale_with_train(accident_count),
-    t_minus_1 = scale_with_train(t_minus_1),
-    t_minus_7 = scale_with_train(t_minus_7),
-    spatial_lag_1 = scale_with_train(spatial_lag_1)
+    across(c(accident_count, t_minus_1, t_minus_12, spatial_lag_1), 
+           ~ (. - acc_min) / (acc_max - acc_min)),
+    pop_lag_1  = (pop_lag_1 - pop_min) / (pop_max - pop_min),
+    rain_lag_1 = (rain_lag_1 - rain_min) / (rain_max - rain_min)
   )
 
-test <- test %>%
-  mutate(
-    accident_count = scale_with_train(accident_count),
-    t_minus_1 = scale_with_train(t_minus_1),
-    t_minus_7 = scale_with_train(t_minus_7),
-    spatial_lag_1 = scale_with_train(spatial_lag_1)
-  )
+test <- ready_data_scaled %>% filter(time_date >= test_start_date)
+train_trad <- ready_data_scaled %>% filter(time_date < test_start_date)
+train_dl <- ready_data_scaled %>% filter(time_date < val_start_date)
+val_dl <- ready_data_scaled %>% filter(time_date >= val_start_date & time_date < test_start_date)
 
-train_X <- as.matrix(train %>% select(t_minus_1, t_minus_7, spatial_lag_1))
-test_X <- as.matrix(test %>% select(t_minus_1, t_minus_7, spatial_lag_1))
+feature_cols <- c("t_minus_1", "t_minus_12", "spatial_lag_1", "pop_lag_1", "rain_lag_1")
 
-train_X_t <- as.matrix(train %>% select(t_minus_1, t_minus_7))
-test_X_t <- as.matrix(test %>% select(t_minus_1, t_minus_7))
+train_X <- as.matrix(train_trad %>% select(all_of(feature_cols)))
+train_X%>%summary()
+test_X <- as.matrix(test %>% select(all_of(feature_cols)))
+train_X_t <- as.matrix(train_trad %>% select(t_minus_1, t_minus_12, pop_lag_1, rain_lag_1))
+test_X_t <- as.matrix(test %>% select(t_minus_1, t_minus_12, pop_lag_1, rain_lag_1))
 
-train_y <- train$accident_count
+train_y <- train_trad$accident_count
 test_y <- test$accident_count
 
 source('Model/STSVR.R')
 source('Model/STARIMA.R')
+gc()
 source('Model/STGCN.R')
+gc()
 source('Model/LSTMGNN.R')
 
 
@@ -155,7 +158,7 @@ test_results_all <- test %>%
     london_msoa_geom %>% select(msoa21cd, geometry),
     by = "msoa21cd"
   )
- 
+
 saveRDS(test_results_all, file = "./Data/CalculatedData/test_results_ALL_MODELS.rds")
 test_results_all <- readRDS("./Data/CalculatedData/test_results_ALL_MODELS.rds")
 

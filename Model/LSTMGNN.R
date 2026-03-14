@@ -2,52 +2,53 @@ source('./utils/gcn_lstm.R')
 
 torch_manual_seed(123)
 
-window_len <- 7
+window_len <- 12
 A_dense <- torch_tensor(listw2mat(W_list), dtype = torch_float32())$to(device = device)
 
-scaled_full_data <- bind_rows(train, test) %>% arrange(time_date, .data[[cscale]])
+scaled_full_data <- bind_rows(train_trad, test) %>% arrange(time_date, .data[[cscale]])
+
+feature_cols <- c("t_minus_1", "t_minus_12", "spatial_lag_1", "pop_lag_1", "rain_lag_1")
+# feature_cols <- c("t_minus_1", "t_minus_12", "spatial_lag_1", "rain_lag_1")
 
 st_data <- create_stgcn_data(
   long_data = scaled_full_data, 
   cscale_col = cscale, 
   time_col = "time_date", 
-  value_col = "accident_count", 
+  value_col = "accident_count",
+  feat_cols = feature_cols,
   window_size = window_len
 )
 
-unique_dates <- sort(unique(ready_data$time_date))
-split_index <- floor(0.8 * length(unique_dates))
-split_date <- unique_dates[split_index]
-
-val_end <- max(which(st_data$times <= split_date))
-train_end <- floor(0.8 * val_end)
+train_end <- max(which(st_data$times < val_start_date))
+val_end <- max(which(st_data$times < test_start_date))
 total_samples <- length(st_data$times)
 
 train_X_array <- st_data$X[1:train_end, , , , drop = FALSE]
-val_X_array   <- st_data$X[(train_end + 1):val_end, , , , drop = FALSE]
-test_X_array  <- st_data$X[(val_end + 1):total_samples, , , , drop = FALSE]
+val_X_array <- st_data$X[(train_end + 1):val_end, , , , drop = FALSE]
+test_X_array <- st_data$X[(val_end + 1):total_samples, , , , drop = FALSE]
 
 train_y_array <- st_data$Y[1:train_end, , , drop = FALSE]
-val_y_array   <- st_data$Y[(train_end + 1):val_end, , , drop = FALSE]
+val_y_array <- st_data$Y[(train_end + 1):val_end, , , drop = FALSE]
 test_y_array  <- st_data$Y[(val_end + 1):total_samples, , , drop = FALSE]
 
 train_x_tensor <- torch_tensor(train_X_array, dtype = torch_float())
 train_y_tensor <- torch_tensor(train_y_array, dtype = torch_float())
 
-val_x_tensor   <- torch_tensor(val_X_array, dtype = torch_float())
-val_y_tensor   <- torch_tensor(val_y_array, dtype = torch_float())
+val_x_tensor <- torch_tensor(val_X_array, dtype = torch_float())
+val_y_tensor <- torch_tensor(val_y_array, dtype = torch_float())
 
-test_x_tensor  <- torch_tensor(test_X_array, dtype = torch_float())
-test_y_tensor  <- torch_tensor(test_y_array, dtype = torch_float())
+test_x_tensor <- torch_tensor(test_X_array, dtype = torch_float())
+test_y_tensor <- torch_tensor(test_y_array, dtype = torch_float())
 
 cat(sprintf("Train: %d, Val: %d, Test: %d\n", dim(train_x_tensor)[1], dim(val_x_tensor)[1], dim(test_x_tensor)[1]))
 
-num_epochs <- 300
+num_epochs <- 100
 min_delta <- 0.00001
-lr = 0.00001
+lr <- 1e-3
 patience <- 10
+batch_size <- 16
 
-stgcn_model <- gcnlstm_net(n_feat = 1, n_hid = 16, n_out = 1, lstm_layers = 1)
+stgcn_model <- gcnlstm_net(n_feat = 5, n_hid = 32, n_out = 1, lstm_layers = 2)
 
 history <- train_model_val(
   model_obj = stgcn_model,
@@ -56,8 +57,10 @@ history <- train_model_val(
   test_x = test_x_tensor, test_y = test_y_tensor,
   A_mat = A_dense,
   save_path = "./Data/CalculatedData/best_gcnlstm_model.pt",
-  num_epochs = num_epochs, patience = patience, min_delta = min_delta, lr = lr
+  num_epochs = num_epochs, patience = patience, min_delta = min_delta, lr = lr,
+  batch_size = batch_size
 )
+saveRDS(history, file = "./Data/CalculatedData/history_gcnlstm.rds")
 
 stgcn_model$load_state_dict(torch_load("./Data/CalculatedData/best_gcnlstm_model.pt"))
 stgcn_model$to(device = device)
@@ -79,3 +82,4 @@ test_results_gcnlstm <- test %>%
 
 test_results_gcnlstm%>%write.csv("./Data/CalculatedData/test_results_gcnlstm.csv")
 test_results_gcnlstm <- read.csv("./Data/CalculatedData/test_results_gcnlstm.csv")
+
