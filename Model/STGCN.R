@@ -10,8 +10,6 @@ train_data <- train_dl
 val_data <- val_dl
 test_data <- test
 
-feature_cols <- c("t_minus_1", "t_minus_12", "spatial_lag_1", "pop_lag_1", "rain_lag_1")
-
 x_ann_train <- as.matrix(train_data %>% select(all_of(feature_cols)))
 x_ann_val <- as.matrix(val_data %>% select(all_of(feature_cols)))
 x_ann_test <- as.matrix(test_data %>% select(all_of(feature_cols)))
@@ -47,7 +45,7 @@ lr <- 1e-3
 patience <- 10
 batch_size <- 16
 
-model_ann <- ann_net(n_feat = 5, n_hid = 16, n_out = 1) 
+model_ann <- ann_net(n_feat = 7, n_hid = 16, n_out = 1) 
 
 cat('ANN')
 hist_ann <- train_model_val(
@@ -69,13 +67,13 @@ with_no_grad({
 
 
 criterion <- nn_mse_loss()
-num_epochs <- 100
+num_epochs <- 200
 min_delta <- 0.00001
-lr <- 1e-2
+lr <- 1e-3
 patience <- 10
 batch_size <- 16
 
-model_stgcn <- gcn_net(n_feat = 5, n_hid = 32, n_out = 1)
+model_stgcn <- gcn_net(n_feat = 7, n_hid = 16, n_out = 1)
 
 cat('STGCN')
 hist_stgcn <- train_model_val(

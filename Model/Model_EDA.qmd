@@ -200,7 +200,8 @@ compare_split_plot <- aggregate_all_models %>%
                "Predicted_stsvr" = "#63e0ff", "Predicted_tsvr" = "#25b7db",
                "Predicted_starima" = "#2fad6e", "Predicted_arima" = "#1a633f",
                "Predicted_ann" = "#d465d6", "Predicted_stgcn" = "#9b819c",
-               "Predicted_gcn_lstm" = "#ff7f00")
+               "Predicted_gcn_lstm" = "#ff7f00"),
+    labels = function(x) toupper(gsub("Predicted_", "", x))
   ) +
   labs(title = "Traffic Accident Predictions by Model Category", y = "Accidents", x = "Date") +
   theme_bw() + 
@@ -216,13 +217,13 @@ ggsave(file = "../Data/Layout/time_based_two_model_compare_split.png", compare_s
 ```
 
 ```{r}
-avg_mse_svr <- round(mean(aggregate_all_models$mse_stsvr_mean, na.rm = TRUE) * 100, 3)
-avg_mse_tsvr <- round(mean(aggregate_all_models$mse_tsvr_mean, na.rm = TRUE) * 100, 3)
-avg_mse_starima <- round(mean(aggregate_all_models$mse_starima_mean, na.rm = TRUE) * 100, 3)
-avg_mse_arima <- round(mean(aggregate_all_models$mse_arima_mean, na.rm = TRUE) * 100, 3)
-avg_mse_stgcn <- round(mean(aggregate_all_models$mse_stgcn_mean, na.rm = TRUE) * 100, 3)
-avg_mse_ann <- round(mean(aggregate_all_models$mse_ann_mean, na.rm = TRUE) * 100, 3)
-avg_mse_lstmgcn <- round(mean(aggregate_all_models$mse_gcn_lstm_mean, na.rm = TRUE) * 100, 3)
+avg_mse_svr <- round(mean(aggregate_all_models$mse_stsvr_mean, na.rm = TRUE), 3)
+avg_mse_tsvr <- round(mean(aggregate_all_models$mse_tsvr_mean, na.rm = TRUE), 3)
+avg_mse_starima <- round(mean(aggregate_all_models$mse_starima_mean, na.rm = TRUE), 3)
+avg_mse_arima <- round(mean(aggregate_all_models$mse_arima_mean, na.rm = TRUE), 3)
+avg_mse_stgcn <- round(mean(aggregate_all_models$mse_stgcn_mean, na.rm = TRUE), 3)
+avg_mse_ann <- round(mean(aggregate_all_models$mse_ann_mean, na.rm = TRUE), 3)
+avg_mse_lstmgcn <- round(mean(aggregate_all_models$mse_gcn_lstm_mean, na.rm = TRUE), 3)
 
 # create table for MSE
 tb <- tibble(

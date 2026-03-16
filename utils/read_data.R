@@ -3,11 +3,11 @@ library(readxl)
 source('./utils/boundaries.R')
 
 # accident <- read_csv('./Data/dft-road-casualty-statistics-collision-1979-latest-published-year.csv') %>%
-#   filter(collision_year >= 2000)%>%
+#   filter(collision_year >= 2010)%>%
 #   filter(!is.na(longitude) & !is.na(latitude)) %>%
 #   st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
-# st_write(accident, "./Data/accident_2000.gpkg", delete_dsn = TRUE)
-accident <- st_read("./Data/accident_2000.gpkg")
+# st_write(accident, "./Data/accident_2010.gpkg", delete_dsn = TRUE)
+accident <- st_read("./Data/accident_2010.gpkg")
 
 london_lsoa_4326 <- st_transform(london_lsoa, 4326)
 accidents_joined <- st_join(accident, london_lsoa_4326, left = FALSE)%>%
@@ -89,48 +89,51 @@ read_final_data <- function(
 # saveRDS(rt, file = "./Data/spatial_data.rds")
 
 # library(sf)
-# rainfall_data <- read_csv('./Data/rainfall_sum.csv')
-# rainfall_sf <- rainfall_data%>%
-#   separate(fy_period, into = c("year_pair", "month"), sep = "_")%>%
+# rainfall_data <- read_csv('./Data/daily_rainfall.csv')
+# split_rainfall_data <- rainfall_data%>%
+#   # splot ob_date to year, month from ex 2020-01-01
+#   separate(ob_date, into = c("year", "month", "day"), sep = "-")%>%
 #   mutate(
-#     Year = as.numeric(paste0("20", substr(year_pair, 1, 2))),
+#     Year = as.numeric(year),
 #     month = as.numeric(month),
-#     time_date = as.Date(paste(Year, month, "01", sep = "-")))%>%
+#     day = as.numeric(day),
+#     time_date = as.Date(paste(year, month, day, sep = "-")))%>%
 #   st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326) %>%
 #   st_transform(crs = st_crs(london_msoa_geom))
 # 
-# rain_msoa_agg <- st_join(rainfall_sf, london_msoa_geom %>% select(msoa21cd)) %>%
+# rain_msoa_agg <- st_join(split_rainfall_data, london_msoa_geom[,'msoa21cd']) %>%
 #   st_drop_geometry() %>%
 #   group_by(msoa21cd, time_date, Year) %>%
-#   summarise(avg_rainfall = mean(prcp_amt, na.rm = TRUE), .groups = "drop")
+#   summarise(avg_rainfall = mean(rainfall_amount, na.rm = TRUE), .groups = "drop")
+# 
+# rt <- read_final_data('MSOA', 'week')
 # rt[[2]] <- rt[[2]] %>%
 #   left_join(rain_msoa_agg, by = c("msoa21cd", "time_date", "Year")) %>%
 #   mutate(avg_rainfall = replace_na(avg_rainfall, 0))
+# saveRDS(rt, file = "./Data/spatial_data_week.rds")
+
+# code_list_df <- read_xlsx('./Data/dft-road-casualty-statistics-road-safety-open-dataset-data-guide-2024.xlsx', sheet = "2024_code_list")
+# collision_codes <- code_list_df %>%
+#   # filter(tolower(table) == 'collision') %>%
+#   filter(!is.na(`code/format`) & !is.na(label))
 # 
-# saveRDS(rt, file = "./Data/spatial_data.rds")
-
-code_list_df <- read_xlsx('./Data/dft-road-casualty-statistics-road-safety-open-dataset-data-guide-2024.xlsx', sheet = "2024_code_list")
-collision_codes <- code_list_df %>%
-  # filter(tolower(table) == 'collision') %>%
-  filter(!is.na(`code/format`) & !is.na(label))
-
-
-mapped_df <- accident
-
-for (col_name in colnames(mapped_df)) {
-
-  original_values <- as.character(mapped_df[[col_name]])
-  mapping <- collision_codes %>% filter(`field name` == col_name)
-
-  # namevec: c('code' = 'label')
-  lookup_vec <- setNames(mapping$label, as.character(mapping$`code/format`))
-  mapped_values <- lookup_vec[original_values]
-
-  matched_indices <- !is.na(mapped_values)
-
-  if (any(matched_indices)) {
-    mapped_df[[col_name]] <- as.character(mapped_df[[col_name]])
-    mapped_df[[col_name]][matched_indices] <- mapped_values[matched_indices]
-  }
-}
-mapped_df
+# 
+# mapped_df <- accident
+# 
+# for (col_name in colnames(mapped_df)) {
+# 
+#   original_values <- as.character(mapped_df[[col_name]])
+#   mapping <- collision_codes %>% filter(`field name` == col_name)
+# 
+#   # namevec: c('code' = 'label')
+#   lookup_vec <- setNames(mapping$label, as.character(mapping$`code/format`))
+#   mapped_values <- lookup_vec[original_values]
+# 
+#   matched_indices <- !is.na(mapped_values)
+# 
+#   if (any(matched_indices)) {
+#     mapped_df[[col_name]] <- as.character(mapped_df[[col_name]])
+#     mapped_df[[col_name]][matched_indices] <- mapped_values[matched_indices]
+#   }
+# }
+# mapped_df

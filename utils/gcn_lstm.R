@@ -109,7 +109,7 @@ gcnlstm_net <- nn_module(
 
     gcn_input <- lstm_last_step$view(c(B, N, -1))
     out <- self$gcn(gcn_input, adj)
-    out <- torch_sigmoid(out)
+    # out <- torch_sigmoid(out)
     
     return(out)
   }

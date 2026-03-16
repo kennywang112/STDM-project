@@ -6,19 +6,15 @@ source('utils/map_func.R')
 rt <- readRDS("./Data/spatial_data.rds")
 final_data <- rt[[2]]
 
-accident <- st_read("./Data/accident_2000.gpkg")
-accidents_joined <- st_join(accident, london_lsoa_4326, left = FALSE)%>%
-  st_transform(27700)
-
 cscale <- 'msoa21cd'
 if (cscale == 'lad22cd') {
-  londona_geom <- london_lad_geom
+  london_geom <- london_lad_geom
   pop <- rt[[1]]
 }else if (cscale == 'msoa21cd') {
-  londona_geom <- london_msoa_geom
+  london_geom <- london_msoa_geom
   pop <- rt[[1]]
 } else if (cscale == 'lsoa21cd') {
-  londona_geom <- london_lsoa
+  london_geom <- london_lsoa
   pop <- rt[[1]]
 }
 
@@ -28,23 +24,23 @@ msoa_counts <- accidents_joined %>%
   group_by(.data[[cscale]]) %>%
   summarise(accident_count = n())
 
-london_stats <- londona_geom %>%
+london_stats <- london_geom %>%
   left_join(msoa_counts, by = cscale) %>%
-  mutate(accident_count = replace_na(accident_count, 0))%>%
-  left_join(pop, by=cscale)%>%
-  mutate(accidents_per_1000 = (accident_count / population) * 100)
+  mutate(accident_count = replace_na(accident_count, 0))#%>%
+  # left_join(pop, by=cscale)%>%
+  # mutate(accidents_per_1000 = (accident_count / population) * 100)
 
-tmap_mode("view")
+tmap_mode("plot")
 accident_count_map <- tm_shape(london_stats) +
   add_map_decorations_polygon("accident_count", "Accidents per LSOA")
 
-accident_rate <- tm_shape(london_stats) +
-  add_map_decorations_polygon("accidents_per_1000", "Accidents Rate") +
-  # title
-  tm_layout(main.title = "Accident Rate (Divided by Population)")
+# accident_rate <- tm_shape(london_stats) +
+#   add_map_decorations_polygon("accidents_per_1000", "Accidents Rate") +
+#   # title
+#   tm_layout(main.title = "Accident Rate (Divided by Population)")
 
-accident_map <- tmap_arrange(accident_count_map, accident_rate, ncol = 2)
-tmap_save(accident_map, filename = paste0("Data/Layout/London_Accidents_Comparison_",cscale,".png", sep=''), width = 12, height = 6, dpi = 300)
+# accident_map <- tmap_arrange(accident_count_map, accident_rate, ncol = 2)
+# tmap_save(accident_map, filename = paste0("Data/Layout/London_Accidents_Comparison_",cscale,".png", sep=''), width = 12, height = 6, dpi = 300)
 
 # Correlation plot
 library(ggpubr)
@@ -54,15 +50,15 @@ ggplot(london_stats, aes(x = population, y = accident_count)) +
   stat_cor(method = "pearson", label.x = 1000, label.y = 50)
 
 # plot neighbor
-nb_list <- poly2nb(londona_geom)
+nb_list <- poly2nb(london_geom)
 W_list <- nb2listw(nb_list, style = "W", zero.policy = TRUE)
 
 tmap_mode("plot")
-coords <- st_coordinates(st_centroid(londona_geom))
-nb_lines <- nb2lines(nb_list, coords = coords, proj4string = st_crs(londona_geom)$proj4string)
+coords <- st_coordinates(st_centroid(london_geom))
+nb_lines <- nb2lines(nb_list, coords = coords, proj4string = st_crs(london_geom)$proj4string)
 nb_lines_sf <- st_as_sf(nb_lines)
 
-neighbor_map <- tm_shape(londona_geom) +
+neighbor_map <- tm_shape(london_geom) +
   tm_borders(col = "lightgrey") +
   tm_shape(nb_lines_sf) +
   tm_lines(col = "red", alpha = 0.5)+
@@ -71,28 +67,28 @@ tmap_save(neighbor_map, filename = paste0("Data/Layout/Neighbor",cscale,".png", 
 
 
 ## morans
-moran_test <- moran.test(london_stats$accidents_per_1000, W_list, zero.policy = TRUE)
-# moran.mc(x=london_stats$accidents_per_1000, listw=W_list, nsim=9999)
+moran_test <- moran.test(london_stats$accident_count, W_list, zero.policy = TRUE)
+# moran.mc(x=london_stats$accident_count, listw=W_list, nsim=9999)
 print(moran_test)
 
-lmoran <- localmoran(london_stats$accidents_per_1000, W_list, zero.policy = TRUE)
+lmoran <- localmoran(london_stats$accident_count, W_list, zero.policy = TRUE)
 
 london_stats$Ii <- lmoran[, 1] # Local Moran statistics
 london_stats$E.Ii<- lmoran[, 2] # Expectation of local moran statistic
 london_stats$Var.Ii<- lmoran[, 3] # Variance of local moran statistic
 london_stats$Z.Ii<- lmoran[, 4] # Standard deviate of local moran statistic
 london_stats$P.Ii <- lmoran[, 5] # P-value
-london_stats$scaled_obs <- scale(london_stats$accidents_per_1000) %>% as.vector()
-london_stats$lag_obs <- lag.listw(W_list, london_stats$scaled_obs)
+london_stats$obs <- scale(london_stats$accident_count) %>% as.vector()
+london_stats$lag_obs <- lag.listw(W_list, london_stats$obs)
 
 alpha <- 0.05
 london_stats <- london_stats %>% 
   mutate(
     type = case_when(
-      scaled_obs > 0 & lag_obs > 0 ~ "High-High",
-      scaled_obs < 0 & lag_obs < 0 ~ "Low-Low",
-      scaled_obs < 0 & lag_obs > 0 ~ "Low-High",
-      scaled_obs > 0 & lag_obs < 0 ~ "High-Low",
+      obs > 0 & obs > 0 ~ "High-High",
+      obs < 0 & obs < 0 ~ "Low-Low",
+      obs < 0 & obs > 0 ~ "Low-High",
+      obs > 0 & obs < 0 ~ "High-Low",
       TRUE ~ "Undefined"
     ),
     cluster_sig = ifelse(P.Ii < alpha, type, "Not Significant")
@@ -119,7 +115,7 @@ morans_map <- tm_basemap("CartoDB.Positron") +
 moran_plot_data <- london_stats %>%
   st_drop_geometry() %>%
   mutate(
-    z_score = scaled_obs,
+    z_score = obs,
     lag_z = lag_obs,
     quadrant = case_when(
       cluster_sig == "Not Significant" ~ "Not Significant",
@@ -130,7 +126,7 @@ moran_plot_data <- london_stats %>%
 moran_i_value <- round(moran_test$estimate[1], 3)
 label_text <- paste("Regression Line\nSlope =", moran_i_value)
 
-moran <- moran.plot(london_stats$accidents_per_1000, listw = W_list)
+moran <- moran.plot(london_stats$accident_count, listw = W_list)
 morans_scatter <- ggplot(moran_plot_data, aes(x = z_score, y = lag_z)) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "black", alpha = 0.6) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "black", alpha = 0.6) +
@@ -152,14 +148,13 @@ ggsave(filename = paste0("Data/Layout/Morans_map_",cscale,".png", sep=''), plot 
 # GI
 # plot the data and neighbours
 
-gi_results <- localG(london_stats$accidents_per_1000, W_list)
+gi_results <- localG(london_stats$accident_count, W_list)
 london_stats$gstat <- as.numeric(gi_results)
 local_g_sf <- london_stats
 
 breaks <- c(-Inf, -2.58, -1.96, -1.65, 1.65, 1.96, 2.58, Inf)
 tmap_mode("plot")
-gi_map <- tm_basemap("CartoDB.Positron") +
-  tm_shape(local_g_sf) + 
+gi_map <- tm_shape(local_g_sf) + 
   tm_polygons("gstat", 
               style = "fixed",
               breaks = breaks,
@@ -172,5 +167,5 @@ gi_map <- tm_basemap("CartoDB.Positron") +
 
 tmap_save(gi_map, filename = paste0("Data/Layout/GI_map_",cscale,".png", sep=''), width = 12, height = 6, dpi = 300)
 
-gi_accrate_layout <- tmap_arrange(accident_rate, gi_map, ncol = 2)
+gi_accrate_layout <- tmap_arrange(accident_count_map, gi_map, ncol = 2)
 tmap_save(gi_accrate_layout, filename = paste0("Data/Layout/GI_AccRate_",cscale,".png", sep=''), width = 12, height = 6, dpi = 300)

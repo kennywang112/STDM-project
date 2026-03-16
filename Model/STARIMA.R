@@ -29,10 +29,6 @@ best_orders <- arimaorder(fit_total)
 best_p <- unname(best_orders["p"])
 best_d <- unname(best_orders["d"])
 best_q <- unname(best_orders["q"])
-best_P <- unname(best_orders["P"])
-best_D <- unname(best_orders["D"])
-best_Q <- unname(best_orders["Q"])
-best_S <- unname(best_orders["m"])
 
 ############################# STARIMA
 fit.star <- starima_fit(Z = train_Z, W = W_mat, p = best_p, d = best_d, q = best_q)
@@ -51,9 +47,7 @@ for (i in 1:N_nodes) {
   region_train <- train_Z[, i]
   region_ts <- ts(region_train, frequency = 12)
   tryCatch({
-    fit_region <- Arima(region_ts, order = c(best_p, best_d, best_q),
-                        seasonal = list(order = c(best_P, best_D, best_Q), period = 12)
-                        )
+    fit_region <- Arima(region_ts, order = c(best_p, best_d, best_q))
     pre_region <- forecast(fit_region, h = n_ahead)
     pred_arima_mat_full[, i] <- as.numeric(pre_region$mean)
   }, error = function(e) {

@@ -7,9 +7,6 @@ A_dense <- torch_tensor(listw2mat(W_list), dtype = torch_float32())$to(device = 
 
 scaled_full_data <- bind_rows(train_trad, test) %>% arrange(time_date, .data[[cscale]])
 
-feature_cols <- c("t_minus_1", "t_minus_12", "spatial_lag_1", "pop_lag_1", "rain_lag_1")
-# feature_cols <- c("t_minus_1", "t_minus_12", "spatial_lag_1", "rain_lag_1")
-
 st_data <- create_stgcn_data(
   long_data = scaled_full_data, 
   cscale_col = cscale, 
@@ -42,13 +39,13 @@ test_y_tensor <- torch_tensor(test_y_array, dtype = torch_float())
 
 cat(sprintf("Train: %d, Val: %d, Test: %d\n", dim(train_x_tensor)[1], dim(val_x_tensor)[1], dim(test_x_tensor)[1]))
 
-num_epochs <- 100
+num_epochs <- 200
 min_delta <- 0.00001
 lr <- 1e-3
 patience <- 10
 batch_size <- 16
 
-stgcn_model <- gcnlstm_net(n_feat = 5, n_hid = 32, n_out = 1, lstm_layers = 2)
+stgcn_model <- gcnlstm_net(n_feat = 7, n_hid = 16, n_out = 1, lstm_layers = 1)
 
 history <- train_model_val(
   model_obj = stgcn_model,

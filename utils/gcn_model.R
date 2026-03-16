@@ -25,8 +25,8 @@ gcn_net <- nn_module(
     x <- torch_relu(x)
     x <- nnf_dropout(x, p = 0.3, training = self$training)
     x <- self$gcn2(x, adj)
+    
     x <- torch_sigmoid(x)
-
     return(x)
   }
 )
@@ -42,7 +42,7 @@ ann_net <- nn_module(
     x <- torch_relu(x)
     x <- nnf_dropout(x, p = 0.3, training = self$training)
     x <- self$fc2(x)
-    x <- torch_sigmoid(x)
+    
     return(x)
   }
 )
