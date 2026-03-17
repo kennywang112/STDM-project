@@ -48,15 +48,13 @@ for(i in road_type){
   
   london_stats <- londona_geom %>%
     left_join(msoa_counts, by = cscale) %>%
-    mutate(accident_count = replace_na(accident_count, 0))%>%
-    left_join(pop, by=cscale)%>%
-    mutate(accidents_per_1000 = (accident_count / population) * 100)
+    mutate(accident_count = replace_na(accident_count, 0))
 
   # title <- paste0("Accidents per LSOA for Road Type: ", i)
 
   tmap_mode("plot")
   map_plot <- tm_shape(london_stats) +
-    add_map_decorations_polygon("accidents_per_1000", i)
+    add_map_decorations_polygon("accident_count", i)
   map_plots[[i]] <- map_plot
   # tmap_save(map_plot, filename = paste0("Data/Layout/London_Accidents_",i,"_",cscale,".png", sep=''), width = 8, height = 6, dpi = 300)
 }

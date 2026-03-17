@@ -32,7 +32,7 @@ london_stats <- london_geom %>%
 
 tmap_mode("plot")
 accident_count_map <- tm_shape(london_stats) +
-  add_map_decorations_polygon("accident_count", "Accidents per LSOA")
+  add_map_decorations_polygon("accident_count", "Accidents per MSOA")
 
 # accident_rate <- tm_shape(london_stats) +
 #   add_map_decorations_polygon("accidents_per_1000", "Accidents Rate") +

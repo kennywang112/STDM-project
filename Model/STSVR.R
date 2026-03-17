@@ -66,41 +66,41 @@ write.csv(test_results_svr, "./Data/CalculatedData/test_results_stsvr.csv", row.
 test_results_svr <- read.csv("./Data/CalculatedData/test_results_stsvr.csv")
 
 ## This is for permutation importance
-library(DALEX)
-set.seed(123)
-sample_idx <- sample(1:nrow(train_trad), 20000)
-train_X_sample <- as.matrix(train_trad[sample_idx, ] %>% select(all_of(feature_cols)))
-train_y_sample <- train_trad$accident_count[sample_idx]
-
-explainer_model <- ksvm(x = train_X_sample, 
-                        y = train_y_sample, 
-                        type = "nu-svr", 
-                        kernel = "rbfdot",
-                        C = 1, 
-                        nu = 0.5,
-                        scaled = FALSE)
-
-train_df_sample <- as.data.frame(train_trad[sample_idx, ] %>% select(all_of(feature_cols)))
-
-pred_func <- function(model, newdata) {
-  newdata_mat <- as.matrix(newdata)
-  return(as.numeric(predict(model, newdata_mat)))
-}
-
-explainer_svr <- explain(
-  model = explainer_model,
-  data = train_df_sample,
-  y = train_trad$accident_count[sample_idx],
-  predict_function = pred_func,
-  label = "Spatio-Temporal SVR"
-)
-
-vip_svr <- model_parts(explainer_svr, loss_function = loss_root_mean_square)
-
-fi <- plot(vip_svr) + 
-  ggtitle("Feature Importance: STSVR Model", "Measured by Dropout Loss (RMSE)")
-ggsave(filename = "./Data/Layout/Feature_Importance_STSVR.png", plot = fi, width = 6, height = 4, dpi = 300)
-
-colnames(train_df_sample)
-pdp_rain <- model_profile(explainer_svr, variables = 'pop_t')
-plot(pdp_rain) + ggtitle("Partial Dependence Plot: Impact of Rainfall")
+# library(DALEX)
+# set.seed(123)
+# sample_idx <- sample(1:nrow(train_trad), 20000)
+# train_X_sample <- as.matrix(train_trad[sample_idx, ] %>% select(all_of(feature_cols)))
+# train_y_sample <- train_trad$accident_count[sample_idx]
+# 
+# explainer_model <- ksvm(x = train_X_sample, 
+#                         y = train_y_sample, 
+#                         type = "nu-svr", 
+#                         kernel = "rbfdot",
+#                         C = 1, 
+#                         nu = 0.5,
+#                         scaled = FALSE)
+# 
+# train_df_sample <- as.data.frame(train_trad[sample_idx, ] %>% select(all_of(feature_cols)))
+# 
+# pred_func <- function(model, newdata) {
+#   newdata_mat <- as.matrix(newdata)
+#   return(as.numeric(predict(model, newdata_mat)))
+# }
+# 
+# explainer_svr <- explain(
+#   model = explainer_model,
+#   data = train_df_sample,
+#   y = train_trad$accident_count[sample_idx],
+#   predict_function = pred_func,
+#   label = "Spatio-Temporal SVR"
+# )
+# 
+# vip_svr <- model_parts(explainer_svr, loss_function = loss_root_mean_square)
+# 
+# fi <- plot(vip_svr) + 
+#   ggtitle("Feature Importance: STSVR Model", "Measured by Dropout Loss (RMSE)")
+# ggsave(filename = "./Data/Layout/Feature_Importance_STSVR.png", plot = fi, width = 6, height = 4, dpi = 300)
+# 
+# colnames(train_df_sample)
+# pdp_rain <- model_profile(explainer_svr, variables = 'pop_t')
+# plot(pdp_rain) + ggtitle("Partial Dependence Plot: Impact of Rainfall")
