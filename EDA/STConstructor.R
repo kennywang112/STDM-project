@@ -6,7 +6,7 @@ library(spdep)
 source('utils/read_data.R')
 source('utils/map_func.R')
 
-time_scale <- "month"
+time_scale <- "week"
 rt_year <- read_final_data('MSOA', time_scale)
 
 final_data <- rt_year[[2]]
