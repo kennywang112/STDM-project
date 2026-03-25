@@ -97,8 +97,8 @@ stgcn_map <- test_results_all %>%
   )
 
 
-residual_layout <- tmap_arrange(starima_map, gcn_lstm_map,
-                                stsvr_map, stgcn_map,
+residual_layout <- tmap_arrange(arima_lstm_map, tsvr_map,
+                                starima_map, stsvr_map,
                                 ncol = 2)
 
 tmap_save(residual_layout, filename = "../Data/Layout/residual_maps.png", width = 12, height = 12, dpi = 300)
@@ -150,7 +150,23 @@ ann_map <- test_results_all %>%
     title = "ANN: Residual Map"
   )
 
-residual_layout <- tmap_arrange(arima_lstm_map, tsvr_map, ann_map,
+tgcn_map <- test_results_all %>%
+  group_by(.data[[cscale]]) %>%
+  summarise(
+    avg_residual = mean(accident_count - Predicted_tgcn, na.rm = TRUE),
+    geometry = st_union(geometry)) %>%
+  st_as_sf()%>%
+  tm_shape() +
+  tm_polygons(
+    fill = "avg_residual",
+    fill.legend = tm_legend(title = "Avg Residual")) +
+  add_map_decorations() +
+  tm_layout(
+    title = "TGCN: Residual Map"
+  )
+
+residual_layout <- tmap_arrange(ann_map, tgcn_map,
+                                stgcn_map, gcn_lstm_map,
                                 ncol = 2)
 
 tmap_save(residual_layout, filename = "../Data/Layout/residual_maps_2.png", width = 12, height = 12, dpi = 300)
@@ -168,9 +184,10 @@ aggregate_all_models <- test_results_all %>%
     mse_stsvr_mean = mean(mse_stsvr, na.rm = TRUE), Predicted_stsvr = sum(Predicted_stsvr, na.rm = TRUE),
     mse_starima_mean = mean(mse_starima, na.rm = TRUE), Predicted_starima = sum(Predicted_starima, na.rm = TRUE),
     mse_arima_mean = mean(mse_arima, na.rm = TRUE), Predicted_arima = sum(Predicted_arima, na.rm = TRUE),
-    mse_stgcn_mean = mean(mse_stgcn, na.rm = TRUE), Predicted_stgcn = sum(Predicted_stgcn, na.rm = TRUE),
+    mse_tgcn_mean = mean(mse_tgcn, na.rm = TRUE), Predicted_tgcn = sum(Predicted_tgcn, na.rm = TRUE),
     mse_ann_mean = mean(mse_ann, na.rm = TRUE), Predicted_ann = sum(Predicted_ann, na.rm = TRUE),
-    mse_gcn_lstm_mean = mean(mse_gcn_lstm, na.rm = TRUE), Predicted_gcn_lstm = sum(Predicted_gcn_lstm, na.rm = TRUE)
+    mse_gcn_lstm_mean = mean(mse_gcn_lstm, na.rm = TRUE), Predicted_gcn_lstm = sum(Predicted_gcn_lstm, na.rm = TRUE),
+    mse_stgcn_mean = mean(mse_stgcn, na.rm = TRUE), Predicted_stgcn = sum(Predicted_stgcn, na.rm = TRUE),
   )
 ```
 
@@ -186,7 +203,7 @@ compare_split_plot <- aggregate_all_models %>%
     Model_Group = case_when(
       Model %in% c("Predicted_tsvr", "Predicted_stsvr") ~ "SVR Models",
       Model %in% c("Predicted_arima", "Predicted_starima") ~ "ARIMA Models",
-      Model %in% c("Predicted_ann", "Predicted_stgcn", "Predicted_gcn_lstm") ~ "Deep Learning Models"
+      Model %in% c("Predicted_ann", "Predicted_tgcn", "Predicted_stgcn", "Predicted_gcn_lstm") ~ "Deep Learning Models"
     ),
     Model_Group = factor(Model_Group, levels = c("ARIMA Models", "SVR Models", "Deep Learning Models"))
   ) %>%
@@ -199,8 +216,8 @@ compare_split_plot <- aggregate_all_models %>%
     values = c("Actual" = "#1e23b3", 
                "Predicted_stsvr" = "#63e0ff", "Predicted_tsvr" = "#25b7db",
                "Predicted_starima" = "#2fad6e", "Predicted_arima" = "#1a633f",
-               "Predicted_ann" = "#d465d6", "Predicted_stgcn" = "#9b819c",
-               "Predicted_gcn_lstm" = "#ff7f00"),
+               "Predicted_ann" = "#d465d6", "Predicted_tgcn" = "#9b819c",
+               "Predicted_gcn_lstm" = "#ff7f00", "Predicted_stgcn" = "#311c45"),
     labels = function(x) toupper(gsub("Predicted_", "", x))
   ) +
   labs(title = "Traffic Accident Predictions by Model Category", y = "Accidents", x = "Date") +
@@ -221,14 +238,15 @@ avg_mse_svr <- round(mean(aggregate_all_models$mse_stsvr_mean, na.rm = TRUE), 3)
 avg_mse_tsvr <- round(mean(aggregate_all_models$mse_tsvr_mean, na.rm = TRUE), 3)
 avg_mse_starima <- round(mean(aggregate_all_models$mse_starima_mean, na.rm = TRUE), 3)
 avg_mse_arima <- round(mean(aggregate_all_models$mse_arima_mean, na.rm = TRUE), 3)
-avg_mse_stgcn <- round(mean(aggregate_all_models$mse_stgcn_mean, na.rm = TRUE), 3)
+avg_mse_tgcn <- round(mean(aggregate_all_models$mse_tgcn_mean, na.rm = TRUE), 3)
 avg_mse_ann <- round(mean(aggregate_all_models$mse_ann_mean, na.rm = TRUE), 3)
 avg_mse_lstmgcn <- round(mean(aggregate_all_models$mse_gcn_lstm_mean, na.rm = TRUE), 3)
+avg_mse_stgcn <- round(mean(aggregate_all_models$mse_stgcn_mean, na.rm = TRUE), 3)
 
 # create table for MSE
 tb <- tibble(
-  Model = c("STSVR", "TSVR", "STARIMA", "ARIMA", "ANN", "TGCN", "GCN+LSTM"),
-  MSE = c(avg_mse_svr, avg_mse_tsvr, avg_mse_starima, avg_mse_arima, avg_mse_stgcn, avg_mse_ann, avg_mse_lstmgcn),
+  Model = c("STSVR", "TSVR", "STARIMA", "ARIMA", "ANN", "TGCN", "GCN+LSTM", "STGCN"),
+  MSE = c(avg_mse_svr, avg_mse_tsvr, avg_mse_starima, avg_mse_arima, avg_mse_ann, avg_mse_tgcn, avg_mse_lstmgcn, avg_mse_stgcn),
 )
 tb
 ```

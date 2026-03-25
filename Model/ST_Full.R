@@ -97,10 +97,9 @@ test_y <- test$accident_count
 source('Model/STSVR.R')
 source('Model/STARIMA.R')
 gc()
-source('Model/STGCN.R')
+source('Model/TGCN.R')
 gc()
 source('Model/LSTMGNN.R')
-
 
 test_results_all <- test %>%
   mutate(accident_count = accident_count * (acc_max - acc_min) + acc_min) %>%
@@ -118,15 +117,21 @@ test_results_all <- test %>%
     by = c("time_date", "msoa21cd")
   ) %>%
   left_join(
-    test_results_stgcn %>%
+    test_results_tgcn %>%
       mutate(time_date = as.character(time_date)) %>%
-      select(time_date, msoa21cd, Predicted_ann, Predicted_stgcn, mse_ann, mse_stgcn),
+      select(time_date, msoa21cd, Predicted_ann, Predicted_tgcn, mse_ann, mse_tgcn),
     by = c("time_date", "msoa21cd")
   ) %>%
   left_join(
     test_results_gcnlstm %>%
       mutate(time_date = as.character(time_date)) %>%
       select(time_date, msoa21cd, Predicted_gcn_lstm, mse_gcn_lstm),
+    by = c("time_date", "msoa21cd")
+  ) %>%
+  left_join(
+    test_results_stgcn %>%
+      mutate(time_date = as.character(time_date)) %>%
+      select(time_date, msoa21cd, Predicted_stgcn, mse_stgcn),
     by = c("time_date", "msoa21cd")
   ) %>%
   mutate(time_date = as.Date(time_date))%>%
