@@ -101,15 +101,18 @@ stgcn_final_model <- stgcn_net_final(
   n_nodes = dim(train_x_tensor)[2], kt = kt, window_size = window_len
 )
 
-history <- train_model_val(
-  model_obj = stgcn_final_model,
-  train_x = train_x_tensor, train_y = train_y_tensor,
-  val_x = val_x_tensor, val_y = val_y_tensor,
-  test_x = test_x_tensor, test_y = test_y_tensor,
-  A_mat = A_dense,
-  save_path = "./Data/CalculatedData/best_stgcn_real_model.pt",
-  num_epochs = 100, patience = 10, lr = 1e-3, batch_size = 16
-)
+time_stgcn <- system.time({
+  history <- train_model_val(
+    model_obj = stgcn_final_model,
+    train_x = train_x_tensor, train_y = train_y_tensor,
+    val_x = val_x_tensor, val_y = val_y_tensor,
+    test_x = test_x_tensor, test_y = test_y_tensor,
+    A_mat = A_dense,
+    save_path = "./Data/CalculatedData/best_stgcn_real_model.pt",
+    num_epochs = 100, patience = 10, lr = 1e-3, batch_size = 16
+  )
+})
+print(time_stgcn)
 
 saveRDS(history, file = "./Data/CalculatedData/history_stgcn.rds")
 

@@ -48,15 +48,18 @@ batch_size <- 16
 model_ann <- ann_net(n_feat = 7, n_hid = 16, n_out = 1) 
 
 cat('ANN')
-hist_ann <- train_model_val(
-  model_obj = model_ann, 
-  train_x = x_tensor, train_y = y_tensor, 
-  val_x = x_val_tensor, val_y = y_val_tensor,
-  test_x = x_test_tensor, test_y = y_test_tensor,
-  save_path = "./Data/CalculatedData/best_model_ann.pt",
-  A_mat = NULL, num_epochs = num_epochs, patience = patience, min_delta = min_delta, lr = lr,
-  batch_size = batch_size
-)
+time_ann <- system.time({
+  hist_ann <- train_model_val(
+    model_obj = model_ann, 
+    train_x = x_tensor, train_y = y_tensor, 
+    val_x = x_val_tensor, val_y = y_val_tensor,
+    test_x = x_test_tensor, test_y = y_test_tensor,
+    save_path = "./Data/CalculatedData/best_model_ann.pt",
+    A_mat = NULL, num_epochs = num_epochs, patience = patience, min_delta = min_delta, lr = lr,
+    batch_size = batch_size
+  )
+})
+print(time_ann)
 
 model_ann$load_state_dict(torch_load("./Data/CalculatedData/best_model_ann.pt"))
 model_ann$to(device = device) 
@@ -76,15 +79,19 @@ batch_size <- 16
 model_tgcn <- gcn_net(n_feat = 7, n_hid = 16, n_out = 1)
 
 cat('tgcn')
-hist_tgcn <- train_model_val(
-  model_obj = model_tgcn, 
-  train_x = x_t_tensor_3d, train_y = y_t_tensor_3d,
-  val_x = x_t_val_tensor_3d,  val_y = y_t_val_tensor_3d,
-  test_x = x_test_t_tensor_3d, test_y = y_test_t_tensor_3d,
-  save_path = "./Data/CalculatedData/best_model_tgcn.pt",
-  A_mat = A_dense, num_epochs = num_epochs, patience = patience, min_delta = min_delta, lr = lr,
-  batch_size = batch_size
-)
+time_tgcn <- system.time({
+  hist_tgcn <- train_model_val(
+    model_obj = model_tgcn, 
+    train_x = x_t_tensor_3d, train_y = y_t_tensor_3d,
+    val_x = x_t_val_tensor_3d,  val_y = y_t_val_tensor_3d,
+    test_x = x_test_t_tensor_3d, test_y = y_test_t_tensor_3d,
+    save_path = "./Data/CalculatedData/best_model_tgcn.pt",
+    A_mat = A_dense, num_epochs = num_epochs, patience = patience, 
+    min_delta = min_delta, lr = lr,
+    batch_size = batch_size
+  )
+})
+print(time_tgcn)
 
 saveRDS(list(ann = hist_ann, tgcn = hist_tgcn), file = "./Data/CalculatedData/history_tgcn.rds")
 

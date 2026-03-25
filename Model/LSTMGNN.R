@@ -47,16 +47,20 @@ batch_size <- 16
 
 stgcn_model <- gcnlstm_net(n_feat = 7, n_hid = 16, n_out = 1, lstm_layers = 1)
 
-history <- train_model_val(
-  model_obj = stgcn_model,
-  train_x = train_x_tensor, train_y = train_y_tensor,
-  val_x = val_x_tensor, val_y = val_y_tensor,
-  test_x = test_x_tensor, test_y = test_y_tensor,
-  A_mat = A_dense,
-  save_path = "./Data/CalculatedData/best_gcnlstm_model.pt",
-  num_epochs = num_epochs, patience = patience, min_delta = min_delta, lr = lr,
-  batch_size = batch_size
-)
+time_gcnlstm <- system.time({
+  history <- train_model_val(
+    model_obj = stgcn_model,
+    train_x = train_x_tensor, train_y = train_y_tensor,
+    val_x = val_x_tensor, val_y = val_y_tensor,
+    test_x = test_x_tensor, test_y = test_y_tensor,
+    A_mat = A_dense,
+    save_path = "./Data/CalculatedData/best_gcnlstm_model.pt",
+    num_epochs = num_epochs, patience = patience, min_delta = min_delta, lr = lr,
+    batch_size = batch_size
+  )
+})
+print(time_gcnlstm)
+
 saveRDS(history, file = "./Data/CalculatedData/history_gcnlstm.rds")
 
 stgcn_model$load_state_dict(torch_load("./Data/CalculatedData/best_gcnlstm_model.pt"))

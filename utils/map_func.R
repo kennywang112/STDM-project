@@ -1,7 +1,7 @@
 add_map_decorations_polygon <- function(col, title) {
   tm_polygons(col = col, 
                 style = "jenks",
-                palette = "Blues", 
+                palette = "Reds", 
                 title = title,
                 border.alpha = 0.5) +
     add_map_decorations()

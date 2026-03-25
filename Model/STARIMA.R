@@ -35,8 +35,11 @@ best_Q <- unname(best_orders["Q"])
 best_S <- unname(best_orders["m"])
 
 ############################# STARIMA
-fit.star <- starima_fit(Z = train_Z, W = W_mat, p = best_p, d = best_d, q = best_q)
-pre.star <- starima_pre(test_Z, model = fit.star)
+time_starima <- system.time({
+  fit.star <- starima_fit(Z = train_Z, W = W_mat, p = best_p, d = best_d, q = best_q)
+  pre.star <- starima_pre(test_Z, model = fit.star)
+})
+print(time_starima)
 
 pred_mat_starima <- as.matrix(pre.star$PRE)
 actual_mat <- as.matrix(test_Z)
@@ -44,25 +47,28 @@ n_rows <- min(nrow(actual_mat), nrow(pred_mat_starima))
 
 ############################## ARIMA
 N_nodes <- ncol(train_Z)
-pred_arima_mat_full <- matrix(NA, nrow = n_ahead, ncol = N_nodes)
-colnames(pred_arima_mat_full) <- colnames(train_Z)
 
-for (i in 1:N_nodes) {
-  region_train <- train_Z[, i]
-  region_ts <- ts(region_train, frequency = 12)
-  tryCatch({
-    fit_region <- Arima(region_ts, order = c(best_p, best_d, best_q))
-    # fit_region <- Arima(region_ts, order = c(best_p, best_d, best_q),
-    #                     seasonal = list(order = c(best_P, best_D, best_Q), period = 12)
-    # )
-    pre_region <- forecast(fit_region, h = n_ahead)
-    pred_arima_mat_full[, i] <- as.numeric(pre_region$mean)
-  }, error = function(e) {
-    fit_naive <- naive(region_ts, h = n_ahead)
-    pred_arima_mat_full[, i] <- as.numeric(fit_naive$mean)
-  })
-}
-
+time_arima <- system.time({
+  pred_arima_mat_full <- matrix(NA, nrow = n_ahead, ncol = N_nodes)
+  colnames(pred_arima_mat_full) <- colnames(train_Z)
+  
+  for (i in 1:N_nodes) {
+    region_train <- train_Z[, i]
+    region_ts <- ts(region_train, frequency = 12)
+    tryCatch({
+      fit_region <- Arima(region_ts, order = c(best_p, best_d, best_q))
+      # fit_region <- Arima(region_ts, order = c(best_p, best_d, best_q),
+      #                     seasonal = list(order = c(best_P, best_D, best_Q), period = 12)
+      # )
+      pre_region <- forecast(fit_region, h = n_ahead)
+      pred_arima_mat_full[, i] <- as.numeric(pre_region$mean)
+    }, error = function(e) {
+      fit_naive <- naive(region_ts, h = n_ahead)
+      pred_arima_mat_full[, i] <- as.numeric(fit_naive$mean)
+    })
+  }
+})
+print(time_arima)
 pred_arima_mat <- tail(pred_arima_mat_full, n_rows)
 pred_starima_mat_aligned <- tail(pred_mat_starima, n_rows)
 actual_mat_aligned <- tail(actual_mat, n_rows)

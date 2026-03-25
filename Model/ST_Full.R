@@ -100,6 +100,8 @@ gc()
 source('Model/TGCN.R')
 gc()
 source('Model/LSTMGNN.R')
+gc()
+source('Model/STGCN.R')
 
 test_results_all <- test %>%
   mutate(accident_count = accident_count * (acc_max - acc_min) + acc_min) %>%

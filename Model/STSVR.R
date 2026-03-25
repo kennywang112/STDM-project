@@ -37,16 +37,41 @@ test_X_5 <- as.matrix(test %>% select(all_of(feature_cols)))
 train_X_t_4 <- as.matrix(train_trad %>% select(all_of(feature_cols))%>%select(-spatial_lag_1))
 test_X_t_4 <- as.matrix(test %>% select(all_of(feature_cols))%>%select(-spatial_lag_1))
 
-results <- mclapply(
-  list(
-    list(x = train_X_5,   y = train_y, test = test_X_5),   # STSVR
-    list(x = train_X_t_4, y = train_y, test = test_X_t_4)  # TSVR
-  ),
-  function(data) {
-    train_ksvm(data$x, data$y, data$test, train_msoa, test_msoa)
-  },
-  mc.cores = 2
-)
+time_taken <- system.time({
+  results <- mclapply(
+    list(
+      list(x = train_X_5,   y = train_y, test = test_X_5),   # STSVR
+      list(x = train_X_t_4, y = train_y, test = test_X_t_4)  # TSVR
+    ),
+    function(data) {
+      train_ksvm(data$x, data$y, data$test, train_msoa, test_msoa)
+    },
+    mc.cores = 2
+  )
+})
+
+print(time_taken)
+
+# This is to get the time for each model separately
+# results_with_time <- mclapply(
+#   list(
+#     list(name="STSVR", x=train_X_5, y=train_y, test=test_X_5),
+#     list(name="TSVR", x=train_X_t_4, y=train_y, test=test_X_t_4)),
+#   function(data) {
+#     start_t <- proc.time()
+#     preds <- train_ksvm(data$x, data$y, data$test, train_msoa, test_msoa)
+#     end_t <- proc.time()
+#     diff_t <- end_t - start_t
+#     return(list(
+#       model_name = data$name,
+#       predictions = preds,
+#       time_elapsed = diff_t["elapsed"]
+#     ))
+#   },
+#   mc.cores = 2
+# )
+# cat("STSVR:", results_with_time[[1]]$time_elapsed)
+# cat("TSVR:", results_with_time[[2]]$time_elapsed)
 
 predictions_st <- results[[1]]
 predictions_t <- results[[2]]
